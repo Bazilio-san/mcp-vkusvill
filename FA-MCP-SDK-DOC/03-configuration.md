@@ -161,7 +161,7 @@ mcp:
 
 swagger:
   servers:
-    - url: https://mcp-vkusvill.bazilio.ru
+    - url: https://mcp-vkusvill.time-gold.com
       description: "PROD server"
 
 homePage:

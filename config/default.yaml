@@ -6,21 +6,10 @@
 #> By default, hosts/ports are resolved via Consul; the fields below let you override that or
 #> describe a service that is not registered in Consul at all.
 #> ========================================================================
-# accessPoints:
-#   myService:
-#     #> Human-readable title shown in diagnostics and admin pages
-#     title: 'My remote service'
-#     #> Remote service host (used when noConsul=true or as a fallback)
-#     host: <host>
-#     #> Remote service TCP port
-#     port: 9999
-#     #> Auth token sent to the remote service
-#     token: '***'
-#     #> Use if the service developers do not provide registration in consul —
-#     #> disables Consul lookup and forces use of the host/port above
-#     noConsul: true
-#     #> Override the Consul service name to look up (defaults to the alias key)
-#     consulServiceName: <consulServiceName>
+accessPoints:
+  vkusvillMcp:
+    host: https://mcp001.vkusvill.ru/mcp
+    noConsul: true
 
 #> ========================================================================
 #> ADMIN PANEL
@@ -43,30 +32,6 @@ adminPanel:
   authType:
     - permanentServerTokens
     - jwtToken
-
-#> Active Directory / LDAP settings.
-#> Used for authentication/authorization (e.g., NTLM in admin panel) and checking user membership in AD groups.
-ad:
-  #> Map of domains. Key is a domain name
-  domains:
-    MYDOMAIN:
-      #> Marks this domain as default one
-      default: true
-      #> List of LDAP controllers (can be multiple for failover).
-      #> Use ldap:// for plain LDAP or ldaps:// for LDAP over TLS.
-      controllers:
-        - 'ldap://c1.corp.com'
-        - 'ldap://c2.corp.com'
-      #> Service account (bind DN or username) used to connect to LDAP.
-      username: '***'
-      #> Service account password.
-      password: '***'
-      #> Base DN for LDAP searches. Auto-derived from controller URL if not set.
-      # baseDn: 'DC=corp,DC=com'
-  #> Cache TTL for group membership checks (default: 600000 = 10 min)
-  # groupCacheTtlMs: 600000
-  #> Cache TTL for user/group DN lookups (default: 86400000 = 24 hours)
-  # dnCacheTtlMs: 86400000
 
 #> Built-in chat UI for testing MCP tools with an LLM.
 agentTester:
@@ -124,98 +89,8 @@ cache:
 
 #> Consul service discovery and registration settings
 consul:
-  #> Health check parameters reported to Consul for this service
-  check:
-    #> How often Consul invokes the health check
-    interval: '10s'
-    #> Per-attempt timeout for the health check
-    timeout: '5s'
-    #> Auto-deregister the service after it has been critical for this duration
-    deregistercriticalserviceafter: '3m'
-  agent:
-    #> Credentials for getting information about services in the DEV DC
-    dev:
-      #> DEV datacenter name
-      dc: 'dc-dev'
-      #> DEV consul agent host
-      host: 'consul.com'
-      #> DEV consul agent port
-      port: 443
-      #> Use HTTPS for the DEV consul agent
-      secure: true
-      #> Token for getting information about DEV services
-      token: '***'
-    #> Credentials for getting information about services in the PROD DC
-    prd:
-      #> PROD datacenter name
-      dc: 'dc-prod'
-      #> PROD consul agent host
-      host: 'consul.com'
-      #> PROD consul agent port
-      port: 443
-      #> Use HTTPS for the PROD consul agent
-      secure: true
-      #> Token for obtaining information about PROD services
-      token: '***'
-    #> Credentials for registering the service with Consul
-    reg:
-      #> The host of the consul agent where the service will be registered.
-      #> If not specified, the server on which the service is running is used
-      host: null
-      #> Consul agent port for registration
-      port: 8500
-      #> Use HTTPS when calling the registration agent
-      secure: false
-      #> Token for registering the service in the consul agent
-      token: '***'
   service:
-    #> true — Allows registration of the service with the consul
     enable: false
-    #> Here you can specify an alternative name for the service.
-    #> String "<name>" will be replaced by env SERVICE_NAME | <package.json>.name at initialization
-    name: <name>
-    #> This value will be specified as a suffix in the id of the service
-    instance: 'prod'
-    #> String "<version>" will be replaced by <package.json>.version at initialization
-    version: <version>
-    #> Here you can specify an alternative name description.
-    #> String "<description>" will be replaced by <package.json>.description at initialization
-    description: <description>
-    #> If null or empty array — Will be pulled up from package.keywords at initialization
-    tags: [ ]
-    #> Arbitrary metadata published with the service registration
-    meta:
-      #> "Home" page link template
-      who: 'http://{address}:{port}/'
-  #> Used to generate the service ID
-  envCode:
-    #> Production environment code
-    prod: 'prod'
-    #> Development environment code
-    dev: 'dev'
-
-#> Database connections used by the service
-db:
-  #> PostgreSQL connection pool definitions
-  postgres:
-    #> Map of named PostgreSQL databases (key is a logical alias used in code)
-    dbs:
-      main:
-        #> Human-readable label shown in diagnostics and admin pages
-        label: 'Your Database Label'
-        #> To exclude the use of the database, you need to set host = ''
-        host: ''
-        #> PostgreSQL server port
-        port: 5432
-        #> Database name
-        database: <database>
-        #> Database user
-        user: <user>
-        #> Database password
-        password: <password>
-        #> List of PostgreSQL extensions required by the service (e.g., 'pgvector', 'uuid-ossp')
-        usedExtensions: []
-        #  - pgvector
 
 #> Service home page (`/`) customization
 homePage:
@@ -373,7 +248,7 @@ swagger:
     #   description: "Development server (all interfaces)"
     # - url: http://<prod_server_host_or_ip>:9048
     #   description: "PROD server"
-    - url: https://mcp-vkusvill.bazilio.ru
+    - url: https://mcp-vkusvill.time-gold.com
       description: "PROD server"
 
 #> UI theme overrides for built-in pages (home, admin, agent-tester)
