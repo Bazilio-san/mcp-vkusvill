@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="OxcSettings">
+    <option name="binaryParameters">
+      <list>
+        <option value="--lsp" />
+      </list>
+    </option>
+    <option name="binaryPath" value="$USER_HOME$/AppData/Roaming/npm/oxlint.cmd" />
+    <option name="configPath" value="$PROJECT_DIR$/.oxlintrc.json" />
+    <option name="configurationMode" value="MANUAL" />
+    <option name="runTrigger" value="ON_SAVE" />
+  </component>
+</project>
