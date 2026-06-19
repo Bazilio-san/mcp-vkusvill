@@ -381,3 +381,27 @@ the cloned tree, so make sure it has run successfully before troubleshooting the
 
 MD lines ≤120 chars. Break at 120. Target 100-120. No short lines (60-80). Fill to ~120.
 Exceptions: URLs, code blocks, tables — no wrap.
+
+### Visual line breaks in lists and legends
+
+When a sentence introduces a set of short parallel items (a legend, a status key, an enumeration of short clauses —
+e.g. `Обозначения:`, `Стек:`), render each item on its own visual line instead of running them together on one line:
+
+- Put the introducing phrase (`Обозначения:`) on its own line, ended with a hard break.
+- Put each item on its own line, each ended with a Markdown hard break.
+- Inside a bullet or paragraph, a labeled sub-clause (`**Осознанно отложено:** …`, `**Why:** …`, `**How to apply:** …`)
+  starts on a new visual line: end the preceding line with a hard break so the label is not glued to the prior sentence.
+
+The hard break is a trailing backslash `\` — use it as the default, because it is visible in the source and survives
+editors that trim trailing whitespace. Two trailing spaces are an equivalent fallback. These hard-broken lines are
+intentionally short and are **exempt** from the "fill to ~120 / no short lines" rule above. The ≤120-char soft wrap
+still applies to the continuation lines of a long item.
+
+## Strings (JS)
+
+Never build a string with `+` concatenation. Whenever a string would overflow the 120-column limit and needs to span
+several source lines, write it as a single multi-line template literal (backticks) instead of joining `'…' + '…' +`
+fragments. Use `${expr}` interpolation rather than `'…' + value` to splice values in. Short single-line strings that
+fit within 120 columns stay as plain quotes. For user-facing text where the exact spacing matters (no stray line
+breaks), keep the wording on one logical line inside the backticks even if that line is long — the formatter leaves
+template-literal contents untouched, which is exactly why they replace `+` wrapping.
