@@ -1,7 +1,7 @@
 {
   "name": "mcp-vkusvill",
   "productName": "MCP VKUSVILL",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "MCP server for integration with VkusVill",
   "type": "module",
   "main": "dist/src/start.js",
@@ -74,6 +74,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Bazilio-san/mcp-vkusvill.git/mcp-vkusvill.git"
+    "url": "git+https://github.com/Bazilio-san/mcp-vkusvill.git"
   }
 }

@@ -24,8 +24,18 @@ const inputSchema: IToolInputSchema = {
       minimum: 0,
       maximum: 999999999,
     },
-    city_id: { type: 'integer', description: 'City ID for filtering', minimum: 0, maximum: 999999999 },
-    subway_id: { type: 'integer', description: 'Metro station ID for filtering', minimum: 0, maximum: 999999999 },
+    city_id: {
+      type: 'integer',
+      description: 'City ID for filtering',
+      minimum: 0,
+      maximum: 999999999,
+    },
+    subway_id: {
+      type: 'integer',
+      description: 'Metro station ID for filtering',
+      minimum: 0,
+      maximum: 999999999,
+    },
     feature_id: {
       type: 'integer',
       description: 'Shop feature ID (e.g. cafe, meat counter)',

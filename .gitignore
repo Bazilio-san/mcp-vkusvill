@@ -81,6 +81,7 @@ _logs/
 
 /_misc_/
 /deploy/config.yml
+/deploy.yaml
 /config/__server__/
 glm.ps1
 glm.sh
@@ -94,3 +95,4 @@ preferred-language.txt
 .agents/
 .qwen/
 /swagger/openapi.yaml
+/_misc/
