@@ -4,5 +4,5 @@
  * LLM doesn't see tools at this level
  */
 
-export const AGENT_BRIEF = `assistant for shopping for groceries and household items: 
-search for products and promotions, composition and KBJU, analogues, store search, recipes and assembly of a link to the cart.`;
+export const AGENT_BRIEF = `assistant for shopping for groceries and household items:
+search for products and promotions, composition and nutrition, analogs, shop search, recipes and building a cart link.`;

@@ -13,7 +13,7 @@ const inputSchema: IToolInputSchema = {
   properties: {
     items: {
       type: 'array',
-      description: 'Товары для корзины (от 1 до 30 позиций)',
+      description: 'Cart items (1 to 30 entries)',
       minItems: 1,
       maxItems: 30,
       items: {
@@ -21,13 +21,13 @@ const inputSchema: IToolInputSchema = {
         properties: {
           xml_id: {
             type: 'integer',
-            description: 'XML ID товара (поле xml_id из результатов поиска)',
+            description: 'Product XML ID (the xml_id field from search results)',
             minimum: 1,
             maximum: 999999999,
           },
           quantity: {
             type: 'number',
-            description: 'Количество (от 0.01 до 40, по умолчанию 1)',
+            description: 'Quantity (0.01 to 40, default 1)',
             minimum: 0.01,
             maximum: 40,
           },
@@ -43,22 +43,24 @@ const inputSchema: IToolInputSchema = {
 
 const definition: Tool = {
   name: 'create_cart_link',
-  title: 'Создать ссылку на корзину',
-  description: `Создаёт ссылку на корзину ВкусВилл с выбранными товарами. На вход — массив items с xml_id товара (из search_products) и количеством. Возвращает ссылку, по которой товары добавляются в корзину одним переходом.`,
+  title: 'Create cart link',
+  description: `Creates a VkusVill cart link with the selected products. 
+Takes an items array with the product xml_id (from search_products) and a quantity. 
+Returns a link that adds the products to the cart in a single click.`,
   inputSchema,
 };
 
-const prompt = `Инструмент create_cart_link собирает ссылку на корзину ВкусВилл.
+const prompt = `The create_cart_link tool builds a VkusVill cart link.
 
-- Передай массив "items"; для каждого товара нужен "xml_id" (берётся из search_products) и "quantity".
-- Сначала найди товары через search_products, чтобы получить их xml_id — не угадывай идентификаторы.`;
+- Pass an "items" array; each product needs an "xml_id" (taken from search_products) and a "quantity".
+- First find the products via search_products to get their xml_id — do not guess the identifiers.`;
 
 const formatCartLink = (data: { link?: string } | undefined): string => {
   const link = data?.link;
   if (!link) {
-    return 'Не удалось создать ссылку на корзину.';
+    return 'Failed to create the cart link.';
   }
-  return `Ссылка на корзину ВкусВилл:\n${link}\n\nПерейдите по ссылке, чтобы товары добавились в корзину для оформления заказа.`;
+  return `VkusVill cart link:\n${link}\n\nFollow the link to add the products to your cart and place the order.`;
 };
 
 export const createCartLinkModule: IToolModule = {

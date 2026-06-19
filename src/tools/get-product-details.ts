@@ -14,7 +14,7 @@ const inputSchema: IToolInputSchema = {
   properties: {
     product_id: {
       type: 'integer',
-      description: 'Числовой ID товара ВкусВилл (поле id из результатов search_products)',
+      description: 'Numeric VkusVill product ID (the id field from search_products results)',
       minimum: 1,
       maximum: 999999999,
     },
@@ -25,20 +25,21 @@ const inputSchema: IToolInputSchema = {
 
 const definition: Tool = {
   name: 'get_product_details',
-  title: 'Детали товара',
-  description: `Детальная информация о товаре ВкусВилл по его id (берётся из search_products): состав, КБЖУ (пищевая ценность), аллергены, срок годности, условия хранения, производитель, цена и рейтинг.`,
+  title: 'Product details',
+  description: `Detailed information about a VkusVill product by its id (taken from search_products): 
+composition, nutrition (calories, proteins, fats, carbs), allergens, shelf life, storage conditions, manufacturer, price and rating.`,
   inputSchema,
 };
 
 /** Detailed product view: short block + brand + composition / nutrition / storage properties. */
 const formatProductDetails = (p: any): string => {
   if (!p || (p.id == null && p.name == null)) {
-    return 'Товар не найден.';
+    return 'Product not found.';
   }
   const lines: string[] = [formatProductShort(p)];
 
   if (p.brand) {
-    lines.push(`Бренд: ${stripHtml(p.brand)}`);
+    lines.push(`Brand: ${stripHtml(p.brand)}`);
   }
   if (p.category?.length) {
     const cats = p.category
@@ -46,11 +47,11 @@ const formatProductDetails = (p: any): string => {
       .filter(Boolean)
       .join(' / ');
     if (cats) {
-      lines.push(`Категория: ${cats}`);
+      lines.push(`Category: ${cats}`);
     }
   }
   if (p.description) {
-    lines.push(`\n**Описание:**\n${stripHtml(p.description)}`);
+    lines.push(`\n**Description:**\n${stripHtml(p.description)}`);
   }
   for (const prop of p.properties || []) {
     const value = stripHtml(prop.value);

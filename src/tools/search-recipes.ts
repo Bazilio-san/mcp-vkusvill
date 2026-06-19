@@ -14,33 +14,33 @@ const inputSchema: IToolInputSchema = {
   properties: {
     query: {
       type: 'string',
-      description: 'Поисковый запрос по рецептам, например «блины» (необязательно)',
+      description: 'Recipe search query, e.g. "pancakes" (optional)',
       maxLength: 255,
     },
     page: {
       type: 'integer',
-      description: 'Номер страницы (по 10 рецептов на странице, по умолчанию 1)',
+      description: 'Page number (10 recipes per page, default 1)',
       minimum: 1,
       maximum: 99999,
     },
     sort: {
       type: 'string',
-      description: 'Сортировка: popularity — по популярности (по умолчанию), new — новинки',
+      description: 'Sorting: popularity — by popularity (default), new — newest',
       enum: ['popularity', 'new'],
     },
     feature_id: {
       type: 'integer',
-      description: 'ID особенности рецепта (см. блок фильтров при page=1)',
+      description: 'Recipe feature ID (see the filters block at page=1)',
       minimum: 0,
       maximum: 999999999,
     },
-    cooking_time_id: { type: 'integer', description: 'ID времени готовки', minimum: 0, maximum: 999999999 },
-    cooking_method_id: { type: 'integer', description: 'ID способа приготовления', minimum: 0, maximum: 999999999 },
-    complexity_id: { type: 'integer', description: 'ID сложности', minimum: 0, maximum: 999999999 },
-    category_id: { type: 'integer', description: 'ID категории', minimum: 0, maximum: 999999999 },
+    cooking_time_id: { type: 'integer', description: 'Cooking time ID', minimum: 0, maximum: 999999999 },
+    cooking_method_id: { type: 'integer', description: 'Cooking method ID', minimum: 0, maximum: 999999999 },
+    complexity_id: { type: 'integer', description: 'Complexity ID', minimum: 0, maximum: 999999999 },
+    category_id: { type: 'integer', description: 'Category ID', minimum: 0, maximum: 999999999 },
     exclude_allergens: {
       type: 'array',
-      description: 'Массив ID аллергенов, которые нужно исключить (см. блок фильтров при page=1)',
+      description: 'Array of allergen IDs to exclude (see the filters block at page=1)',
       items: { type: 'integer', minimum: 1, maximum: 999999999 },
     },
   },
@@ -50,8 +50,10 @@ const inputSchema: IToolInputSchema = {
 
 const definition: Tool = {
   name: 'search_recipes',
-  title: 'Поиск рецептов',
-  description: `Поиск рецептов ВкусВилл по запросу и фильтрам. Возвращает ингредиенты, КБЖУ на 100 г, пошаговое приготовление, аллергены. Чтобы узнать id фильтров (время готовки, способ, сложность, аллергены), вызовите с page=1 — справочник придёт в блоке фильтров.`,
+  title: 'Find recipes',
+  description: `Search VkusVill recipes by query and filters. 
+Returns ingredients, nutrition per 100 g (calories, proteins, fats, carbs), step-by-step instructions, allergens. 
+To find the filter ids (cooking time, method, complexity, allergens), call with page=1 — the reference will come in the filters block.`,
   inputSchema,
 };
 
@@ -75,13 +77,13 @@ const formatRecipe = (r: IRecipe, index?: number): string => {
 
   const meta: string[] = [];
   if (r.complexity?.name) {
-    meta.push(`сложность: ${stripHtml(r.complexity.name)}`);
+    meta.push(`complexity: ${stripHtml(r.complexity.name)}`);
   }
   if (r.cooking_time?.name) {
-    meta.push(`время: ${stripHtml(r.cooking_time.name)}`);
+    meta.push(`time: ${stripHtml(r.cooking_time.name)}`);
   }
   if (r.portions != null) {
-    meta.push(`порций: ${r.portions}`);
+    meta.push(`portions: ${r.portions}`);
   }
   if (meta.length) {
     lines.push(meta.join(', '));
@@ -92,7 +94,7 @@ const formatRecipe = (r: IRecipe, index?: number): string => {
   if (r.nutritional && r.nutritional.calories != null) {
     const n = r.nutritional;
     lines.push(
-      `КБЖУ на 100 г: ${num(n.calories)} ккал, белки ${num(n.proteins)} г, жиры ${num(n.fats)} г, углеводы ${num(n.carbs)} г`,
+      `Nutrition per 100 g: ${num(n.calories)} kcal, proteins ${num(n.proteins)} g, fats ${num(n.fats)} g, carbs ${num(n.carbs)} g`,
     );
   }
   if (r.allergens?.length) {
@@ -101,7 +103,7 @@ const formatRecipe = (r: IRecipe, index?: number): string => {
       .filter(Boolean)
       .join(', ');
     if (a) {
-      lines.push(`Аллергены: ${a}`);
+      lines.push(`Allergens: ${a}`);
     }
   }
   if (r.ingredients?.length) {
@@ -111,11 +113,11 @@ const formatRecipe = (r: IRecipe, index?: number): string => {
         return it.quantity ? `- ${name} — ${stripHtml(it.quantity)}` : `- ${name}`;
       })
       .join('\n');
-    lines.push(`\n**Ингредиенты:**\n${ing}`);
+    lines.push(`\n**Ingredients:**\n${ing}`);
   }
   if (r.steps?.length) {
     const steps = r.steps.map((s) => `${s.step_number ?? ''}. ${stripHtml(s.text)}`.trim()).join('\n');
-    lines.push(`\n**Приготовление:**\n${steps}`);
+    lines.push(`\n**Instructions:**\n${steps}`);
   }
   if (r.url) {
     lines.push(`\n${r.url}`);
@@ -126,9 +128,9 @@ const formatRecipe = (r: IRecipe, index?: number): string => {
 const formatRecipesList = (data: { meta?: any; items?: IRecipe[] } | undefined): string => {
   const items = data?.items || [];
   if (!items.length) {
-    return 'Рецепты не найдены.';
+    return 'No recipes found.';
   }
-  const header = formatListMeta(data?.meta, 'рецептов');
+  const header = formatListMeta(data?.meta, 'recipes');
   const blocks = items.map((r, i) => formatRecipe(r, i + 1));
   const filters = formatFilters(data?.meta?.filters);
   return [header, '', ...blocks, filters].filter(Boolean).join('\n\n');

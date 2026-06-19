@@ -26,10 +26,6 @@ const startProject = async (): Promise<void> => {
     agentBrief: AGENT_BRIEF,
     agentPrompt: AGENT_PROMPT,
     toolPrompt,
-    usedHttpHeaders: [
-      { name: 'Authorization', description: 'JWT Token issued on request' },
-      { name: 'x-test-header', description: 'Any custom header', isOptional: true },
-    ],
 
     // HTTP components
     httpComponents: { apiRouter },

@@ -14,7 +14,7 @@ const inputSchema: IToolInputSchema = {
   properties: {
     product_id: {
       type: 'integer',
-      description: 'Числовой ID товара ВкусВилл (поле id из результатов search_products)',
+      description: 'Numeric VkusVill product ID (the id field from search_products results)',
       minimum: 1,
       maximum: 999999999,
     },
@@ -25,9 +25,9 @@ const inputSchema: IToolInputSchema = {
 
 const definition: Tool = {
   name: 'get_product_analogs',
-  title: 'Аналоги товара',
-  description:
-    'Похожие товары (аналоги) для товара ВкусВилл по его id из search_products. Удобно для замены или сравнения.',
+  title: 'Product analogs',
+  description: `Similar products (analogs) for a VkusVill product by its id from search_products. 
+Handy for replacement or comparison.`,
   inputSchema,
 };
 
@@ -35,9 +35,9 @@ const definition: Tool = {
 const formatAnalogsList = (data: any): string => {
   const items = data?.products || [];
   if (!items.length) {
-    return 'Аналоги не найдены.';
+    return 'No analogs found.';
   }
-  const header = `Аналоги товара ${data?.product_id ?? ''} — найдено ${data?.total ?? items.length}:`.trim();
+  const header = `Analogs for product ${data?.product_id ?? ''} — ${data?.total ?? items.length} found:`.trim();
   const blocks = items.map((p: any, i: number) => formatProductShort(p, i + 1));
   return [header, '', ...blocks].join('\n\n');
 };

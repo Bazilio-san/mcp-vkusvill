@@ -12,21 +12,21 @@ import { IToolModule } from '../_types_/common';
 const inputSchema: IToolInputSchema = {
   type: 'object',
   properties: {
-    query: { type: 'string', description: 'Поисковый запрос, например «молоко 3.2» или «хлеб бездрожжевой»' },
+    query: { type: 'string', description: 'Search query, e.g. "milk 3.2" or "yeast-free bread"' },
     page: {
       type: 'integer',
-      description: 'Номер страницы результатов (по 10 товаров на странице, по умолчанию 1)',
+      description: 'Result page number (10 products per page, default 1)',
       minimum: 1,
       maximum: 99999,
     },
     sort: {
       type: 'string',
-      description: `Сортировка: popularity — по популярности (по умолчанию), rating — по рейтингу, price_asc — дешевле сначала, price_desc — дороже сначала, new — новинки`,
+      description: `Sorting: popularity — by popularity (default), rating — by rating, price_asc — cheapest first, price_desc — most expensive first, new — newest`,
       enum: ['popularity', 'rating', 'price_asc', 'price_desc', 'new'],
     },
     vvonly: {
       type: 'integer',
-      description: 'Искать только товары бренда ВкусВилл: 1 — да (по умолчанию), 0 — все товары',
+      description: 'Search only VkusVill brand products: 1 — yes (default), 0 — all products',
       enum: [0, 1],
     },
   },
@@ -36,16 +36,18 @@ const inputSchema: IToolInputSchema = {
 
 const definition: Tool = {
   name: 'search_products',
-  title: 'Поиск товаров ВкусВилл',
-  description: `Поиск товаров ВкусВилл по текстовому запросу. Возвращает список товаров с ценой, рейтингом, весом, ссылкой и идентификаторами (id, xml_id). По 10 товаров на странице — для следующих результатов увеличивайте page.`,
+  title: 'VkusVill product search',
+  description: `Search VkusVill products by a text query. 
+Returns a list of products with price, rating, weight, link and identifiers (id, xml_id). 
+10 products per page — increase page for further results.`,
   inputSchema,
 };
 
-const prompt = `Инструмент search_products ищет товары ВкусВилл по тексту.
+const prompt = `The search_products tool searches VkusVill products by text.
 
-- Запрос передавай в обязательное поле "query".
-- В ответе у каждого товара есть "id" (для get_product_details / get_product_analogs) и "xml_id" (для create_cart_link).
-- На странице 10 товаров; для следующих результатов увеличивай "page".`;
+- Pass the query in the required "query" field.
+- In the response each product has an "id" (for get_product_details / get_product_analogs) and an "xml_id" (for create_cart_link).
+- 10 products per page; increase "page" for further results.`;
 
 export const searchProductsModule: IToolModule = {
   definition,
@@ -61,6 +63,6 @@ export const searchProductsModule: IToolModule = {
       },
       signal,
     );
-    return asTextContent(formatProductsList(data, 'товаров'));
+    return asTextContent(formatProductsList(data, 'products'));
   },
 };

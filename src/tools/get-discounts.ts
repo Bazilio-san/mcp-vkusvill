@@ -14,23 +14,23 @@ const inputSchema: IToolInputSchema = {
   properties: {
     discount_type: {
       type: 'string',
-      description: 'Тип скидки: card — по карте лояльности (по умолчанию), quantity — при покупке нескольких товаров',
+      description: 'Discount type: card — loyalty card discount (default), quantity — when buying several items',
       enum: ['card', 'quantity'],
     },
     page: {
       type: 'integer',
-      description: 'Номер страницы (по 10 товаров на странице, по умолчанию 1)',
+      description: 'Page number (10 products per page, default 1)',
       minimum: 1,
       maximum: 99999,
     },
     sort: {
       type: 'string',
-      description: 'Сортировка: popularity (по умолчанию), rating, price_asc, price_desc, new, name_asc, name_desc',
+      description: 'Sorting: popularity (default), rating, price_asc, price_desc, new, name_asc, name_desc',
       enum: ['popularity', 'rating', 'price_asc', 'price_desc', 'new', 'name_asc', 'name_desc'],
     },
     vvonly: {
       type: 'integer',
-      description: 'Только товары бренда ВкусВилл: 1 — да (по умолчанию), 0 — все',
+      description: 'VkusVill brand products only: 1 — yes (default), 0 — all',
       enum: [0, 1],
     },
   },
@@ -40,8 +40,10 @@ const inputSchema: IToolInputSchema = {
 
 const definition: Tool = {
   name: 'get_discounts',
-  title: 'Акционные товары',
-  description: `Список акционных товаров ВкусВилл со скидками. Тип скидки: card — по карте лояльности, quantity — при покупке нескольких товаров. Показывает старую и новую цену, размер и условия скидки.`,
+  title: 'Discounted products',
+  description: `A list of discounted VkusVill products. 
+Discount type: card — loyalty card discount, quantity — when buying several items. 
+Shows the old and new price, the discount size and conditions.`,
   inputSchema,
 };
 
@@ -58,6 +60,6 @@ export const getDiscountsModule: IToolModule = {
       },
       signal,
     );
-    return asTextContent(formatProductsList(data, 'акционных товаров'));
+    return asTextContent(formatProductsList(data, 'discounted products'));
   },
 };

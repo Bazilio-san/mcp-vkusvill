@@ -79,7 +79,7 @@ export const handleToolCall = async (params: IToolHandlerParams): Promise<TToolH
     // Business / upstream errors → surface to the LLM as a tool-level error, do not throw.
     if (error instanceof VkusvillApiError) {
       logger.warn(`Upstream error for ${name}: ${error.message}`);
-      return asTextError(`Сервис ВкусВилл не смог выполнить запрос: ${error.message}`);
+      return asTextError(`The VkusVill service could not complete the request: ${error.message}`);
     }
     logger.error(`Tool execution failed for ${name}:`, error);
     error.printed = true;

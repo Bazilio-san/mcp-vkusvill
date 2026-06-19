@@ -14,21 +14,21 @@ const inputSchema: IToolInputSchema = {
   properties: {
     page: {
       type: 'integer',
-      description: 'Номер страницы (по 10 магазинов на странице, по умолчанию 1)',
+      description: 'Page number (10 shops per page, default 1)',
       minimum: 1,
       maximum: 99999,
     },
     region_id: {
       type: 'integer',
-      description: 'ID региона для фильтра (список id возвращается в блоке фильтров при page=1)',
+      description: 'Region ID for filtering (the list of ids is returned in the filters block at page=1)',
       minimum: 0,
       maximum: 999999999,
     },
-    city_id: { type: 'integer', description: 'ID города для фильтра', minimum: 0, maximum: 999999999 },
-    subway_id: { type: 'integer', description: 'ID станции метро для фильтра', minimum: 0, maximum: 999999999 },
+    city_id: { type: 'integer', description: 'City ID for filtering', minimum: 0, maximum: 999999999 },
+    subway_id: { type: 'integer', description: 'Metro station ID for filtering', minimum: 0, maximum: 999999999 },
     feature_id: {
       type: 'integer',
-      description: 'ID особенности магазина (например, кафе, мясная витрина)',
+      description: 'Shop feature ID (e.g. cafe, meat counter)',
       minimum: 0,
       maximum: 999999999,
     },
@@ -39,8 +39,9 @@ const inputSchema: IToolInputSchema = {
 
 const definition: Tool = {
   name: 'find_shops',
-  title: 'Поиск магазинов',
-  description: `Поиск магазинов ВкусВилл: адрес, координаты, телефон, режим работы, особенности. Чтобы узнать доступные id регионов, городов и метро для фильтров, вызовите без фильтров (page=1) — справочник придёт в блоке фильтров.`,
+  title: 'Find shops',
+  description: `Search VkusVill shops: address, coordinates, phone, opening hours, features. 
+To find the available region, city and metro ids for filters, call without filters (page=1) — the reference will come in the filters block.`,
   inputSchema,
 };
 
@@ -61,20 +62,20 @@ interface IShop {
 }
 
 const formatShop = (s: IShop, index?: number): string => {
-  const title = [s.city?.name, s.address].filter(Boolean).map(stripHtml).join(', ') || `Магазин ${s.id}`;
+  const title = [s.city?.name, s.address].filter(Boolean).map(stripHtml).join(', ') || `Shop ${s.id}`;
   const lines: string[] = [index != null ? `### ${index}. ${title}` : `### ${title}`];
 
   if (s.subway) {
-    lines.push(`Метро: ${stripHtml(s.subway)}`);
+    lines.push(`Metro: ${stripHtml(s.subway)}`);
   }
   if (s.schedule) {
-    lines.push(`Режим работы: ${stripHtml(s.schedule)}`);
+    lines.push(`Opening hours: ${stripHtml(s.schedule)}`);
   }
   if (s.phone?.length) {
-    lines.push(`Телефон: ${s.phone.join(', ')}`);
+    lines.push(`Phone: ${s.phone.join(', ')}`);
   }
   if (s.rating != null) {
-    lines.push(`Рейтинг: ${num(s.rating)}`);
+    lines.push(`Rating: ${num(s.rating)}`);
   }
   if (s.features?.length) {
     const feats = s.features
@@ -82,11 +83,11 @@ const formatShop = (s: IShop, index?: number): string => {
       .filter(Boolean)
       .join(', ');
     if (feats) {
-      lines.push(`Особенности: ${feats}`);
+      lines.push(`Features: ${feats}`);
     }
   }
   if (s.lat != null && s.lon != null) {
-    lines.push(`Координаты: ${num(s.lat)}, ${num(s.lon)}`);
+    lines.push(`Coordinates: ${num(s.lat)}, ${num(s.lon)}`);
   }
   if (s.url) {
     lines.push(s.url);
@@ -97,9 +98,9 @@ const formatShop = (s: IShop, index?: number): string => {
 const formatShopsList = (data: { meta?: any; items?: IShop[] } | undefined): string => {
   const items = data?.items || [];
   if (!items.length) {
-    return 'Магазины не найдены.';
+    return 'No shops found.';
   }
-  const header = formatListMeta(data?.meta, 'магазинов');
+  const header = formatListMeta(data?.meta, 'shops');
   const blocks = items.map((s, i) => formatShop(s, i + 1));
   const filters = formatFilters(data?.meta?.filters);
   return [header, '', ...blocks, filters].filter(Boolean).join('\n\n');

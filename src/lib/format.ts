@@ -49,9 +49,9 @@ const formatPrice = (price: Price): string | null => {
   if (!price || price.current == null) {
     return null;
   }
-  let line = `Цена: ${num(price.current)} ₽`;
+  let line = `Price: ${num(price.current)} ₽`;
   if (price.old != null && Number(price.old) > Number(price.current)) {
-    line += ` (было ${num(price.old)} ₽`;
+    line += ` (was ${num(price.old)} ₽`;
     if (price.discount_percent != null) {
       line += `, −${num(price.discount_percent)}%`;
     }
@@ -86,20 +86,20 @@ export const formatProductShort = (p: IProduct, index?: number): string => {
     lines.push(price);
   }
   if (p.price?.discount_info) {
-    lines.push(`Акция: ${stripHtml(p.price.discount_info)}`);
+    lines.push(`Promo: ${stripHtml(p.price.discount_info)}`);
   }
   if (p.rating?.average != null) {
-    const count = p.rating.count != null ? ` (${p.rating.count} отзывов)` : '';
-    lines.push(`Рейтинг: ${num(p.rating.average)}${count}`);
+    const count = p.rating.count != null ? ` (${p.rating.count} reviews)` : '';
+    lines.push(`Rating: ${num(p.rating.average)}${count}`);
   }
   if (p.weight?.value != null) {
-    lines.push(`Вес: ${num(p.weight.value)} ${p.weight.unit || ''}`.trim());
+    lines.push(`Weight: ${num(p.weight.value)} ${p.weight.unit || ''}`.trim());
   }
   const ids: string[] = [];
   if (p.id != null) {
     ids.push(`ID ${p.id}`);
   }
-  if (p.xml_id != null && p.xml_id !== p.id) {
+  if (p.xml_id != null) {
     ids.push(`XML ID ${p.xml_id}`);
   }
   if (ids.length) {
@@ -126,14 +126,14 @@ export const formatListMeta = (meta: IListMeta | undefined, noun: string): strin
   }
   const parts: string[] = [];
   if (meta.total != null) {
-    parts.push(`найдено ${noun}: ${meta.total}`);
+    parts.push(`${noun} found: ${meta.total}`);
   }
   if (meta.page != null && meta.pages != null) {
-    parts.push(`страница ${meta.page} из ${meta.pages}`);
+    parts.push(`page ${meta.page} of ${meta.pages}`);
   }
   let line = parts.join(', ');
   if (meta.has_more) {
-    line += ' (есть ещё — запросите следующую страницу)';
+    line += ' (more available — request the next page)';
   }
   return line;
 };
@@ -141,11 +141,11 @@ export const formatListMeta = (meta: IListMeta | undefined, noun: string): strin
 /** Full product list (search / discount): header + short blocks. Shared by two tools. */
 export const formatProductsList = (
   data: { meta?: IListMeta; items?: IProduct[] } | undefined,
-  noun = 'товаров',
+  noun = 'products',
 ): string => {
   const items = data?.items || [];
   if (!items.length) {
-    return 'Товары не найдены.';
+    return 'No products found.';
   }
   const header = formatListMeta(data?.meta, noun);
   const blocks = items.map((p, i) => formatProductShort(p, i + 1));
@@ -174,5 +174,5 @@ export const formatFilters = (filters: IFilterGroup[] | undefined): string => {
     const more = (g.items?.length || 0) > 40 ? ', …' : '';
     return `**${stripHtml(g.name)}** (${g.param}): ${items}${more}`;
   });
-  return ['\n**Доступные фильтры** (передайте нужный id в параметрах):', ...groups].join('\n');
+  return ['\n**Available filters** (pass the needed id in the parameters):', ...groups].join('\n');
 };

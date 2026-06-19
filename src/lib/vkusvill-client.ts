@@ -112,7 +112,7 @@ export class VkusvillClient {
       const text = await response.text();
       if (!response.ok) {
         throw new VkusvillApiError(
-          `Сервис ВкусВилл вернул HTTP ${response.status}`,
+          `The VkusVill service returned HTTP ${response.status}`,
           'http_error',
           response.status,
           response.status >= 500,
@@ -161,7 +161,7 @@ export class VkusvillClient {
 
     if (body?.error) {
       const msg = body.error?.message || JSON.stringify(body.error);
-      throw new VkusvillApiError(`Ошибка протокола MCP: ${msg}`, 'jsonrpc_error');
+      throw new VkusvillApiError(`MCP protocol error: ${msg}`, 'jsonrpc_error');
     }
 
     const result = body?.result ?? body;
@@ -179,7 +179,7 @@ export class VkusvillClient {
     if (envelope && envelope.ok === false) {
       const err = envelope.error || {};
       throw new VkusvillApiError(
-        err.message || 'Сервис ВкусВилл вернул ошибку',
+        err.message || 'The VkusVill service returned an error',
         err.code || 'upstream_error',
         err.http_status,
         Boolean(err.retryable),
@@ -204,7 +204,7 @@ export class VkusvillClient {
       if (signal?.aborted) {
         throw error;
       }
-      logger.warn(`Повторная попытка вызова ${name} после ошибки: ${(error as Error).message}`);
+      logger.warn(`Retrying call ${name} after error: ${(error as Error).message}`);
       this.sessionId = null;
       await new Promise((resolve) => setTimeout(resolve, 1000));
       return this.callOnce(name, args, signal);
