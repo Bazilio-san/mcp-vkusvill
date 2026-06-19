@@ -2,7 +2,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
-import { formatRecipesList } from '../lib/format.js';
+import { formatFilters, formatListMeta, num, stripHtml } from '../lib/format.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
 
 import { IToolModule } from '../_types_/common';
@@ -51,10 +51,87 @@ const inputSchema: IToolInputSchema = {
 const definition: Tool = {
   name: 'search_recipes',
   title: 'Поиск рецептов',
-  description:
-    'Поиск рецептов ВкусВилл по запросу и фильтрам. Возвращает ингредиенты, КБЖУ на 100 г, пошаговое приготовление, аллергены. ' +
-    'Чтобы узнать id фильтров (время готовки, способ, сложность, аллергены), вызовите с page=1 — справочник придёт в блоке фильтров.',
+  description: `Поиск рецептов ВкусВилл по запросу и фильтрам. Возвращает ингредиенты, КБЖУ на 100 г, пошаговое приготовление, аллергены. Чтобы узнать id фильтров (время готовки, способ, сложность, аллергены), вызовите с page=1 — справочник придёт в блоке фильтров.`,
   inputSchema,
+};
+
+interface IRecipe {
+  id?: number;
+  name?: string;
+  description?: string;
+  complexity?: { name?: string } | null;
+  portions?: number | null;
+  cooking_time?: { name?: string } | null;
+  url?: string;
+  image?: string;
+  ingredients?: Array<{ name?: string; quantity?: string | null }> | null;
+  steps?: Array<{ step_number?: number; text?: string }> | null;
+  nutritional?: { calories?: number; proteins?: number; fats?: number; carbs?: number } | null;
+  allergens?: Array<{ name?: string }> | null;
+}
+
+const formatRecipe = (r: IRecipe, index?: number): string => {
+  const lines: string[] = [index != null ? `### ${index}. ${stripHtml(r.name)}` : `### ${stripHtml(r.name)}`];
+
+  const meta: string[] = [];
+  if (r.complexity?.name) {
+    meta.push(`сложность: ${stripHtml(r.complexity.name)}`);
+  }
+  if (r.cooking_time?.name) {
+    meta.push(`время: ${stripHtml(r.cooking_time.name)}`);
+  }
+  if (r.portions != null) {
+    meta.push(`порций: ${r.portions}`);
+  }
+  if (meta.length) {
+    lines.push(meta.join(', '));
+  }
+  if (r.description) {
+    lines.push(stripHtml(r.description));
+  }
+  if (r.nutritional && r.nutritional.calories != null) {
+    const n = r.nutritional;
+    lines.push(
+      `КБЖУ на 100 г: ${num(n.calories)} ккал, белки ${num(n.proteins)} г, жиры ${num(n.fats)} г, углеводы ${num(n.carbs)} г`,
+    );
+  }
+  if (r.allergens?.length) {
+    const a = r.allergens
+      .map((x) => stripHtml(x.name))
+      .filter(Boolean)
+      .join(', ');
+    if (a) {
+      lines.push(`Аллергены: ${a}`);
+    }
+  }
+  if (r.ingredients?.length) {
+    const ing = r.ingredients
+      .map((it) => {
+        const name = stripHtml(it.name);
+        return it.quantity ? `- ${name} — ${stripHtml(it.quantity)}` : `- ${name}`;
+      })
+      .join('\n');
+    lines.push(`\n**Ингредиенты:**\n${ing}`);
+  }
+  if (r.steps?.length) {
+    const steps = r.steps.map((s) => `${s.step_number ?? ''}. ${stripHtml(s.text)}`.trim()).join('\n');
+    lines.push(`\n**Приготовление:**\n${steps}`);
+  }
+  if (r.url) {
+    lines.push(`\n${r.url}`);
+  }
+  return lines.join('\n');
+};
+
+const formatRecipesList = (data: { meta?: any; items?: IRecipe[] } | undefined): string => {
+  const items = data?.items || [];
+  if (!items.length) {
+    return 'Рецепты не найдены.';
+  }
+  const header = formatListMeta(data?.meta, 'рецептов');
+  const blocks = items.map((r, i) => formatRecipe(r, i + 1));
+  const filters = formatFilters(data?.meta?.filters);
+  return [header, '', ...blocks, filters].filter(Boolean).join('\n\n');
 };
 
 export const searchRecipesModule: IToolModule = {

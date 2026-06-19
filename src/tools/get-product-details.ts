@@ -2,7 +2,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
-import { formatProductDetails } from '../lib/format.js';
+import { formatProductShort, stripHtml } from '../lib/format.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
 
 import { IToolModule } from '../_types_/common';
@@ -26,10 +26,39 @@ const inputSchema: IToolInputSchema = {
 const definition: Tool = {
   name: 'get_product_details',
   title: 'Детали товара',
-  description:
-    'Детальная информация о товаре ВкусВилл по его id (берётся из search_products): состав, КБЖУ (пищевая ценность), ' +
-    'аллергены, срок годности, условия хранения, производитель, цена и рейтинг.',
+  description: `Детальная информация о товаре ВкусВилл по его id (берётся из search_products): состав, КБЖУ (пищевая ценность), аллергены, срок годности, условия хранения, производитель, цена и рейтинг.`,
   inputSchema,
+};
+
+/** Detailed product view: short block + brand + composition / nutrition / storage properties. */
+const formatProductDetails = (p: any): string => {
+  if (!p || (p.id == null && p.name == null)) {
+    return 'Товар не найден.';
+  }
+  const lines: string[] = [formatProductShort(p)];
+
+  if (p.brand) {
+    lines.push(`Бренд: ${stripHtml(p.brand)}`);
+  }
+  if (p.category?.length) {
+    const cats = p.category
+      .map((c: any) => stripHtml(c.name))
+      .filter(Boolean)
+      .join(' / ');
+    if (cats) {
+      lines.push(`Категория: ${cats}`);
+    }
+  }
+  if (p.description) {
+    lines.push(`\n**Описание:**\n${stripHtml(p.description)}`);
+  }
+  for (const prop of p.properties || []) {
+    const value = stripHtml(prop.value);
+    if (value) {
+      lines.push(`\n**${stripHtml(prop.name)}:**\n${value}`);
+    }
+  }
+  return lines.join('\n');
 };
 
 export const getProductDetailsModule: IToolModule = {

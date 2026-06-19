@@ -2,7 +2,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
-import { formatAnalogsList } from '../lib/format.js';
+import { formatProductShort } from '../lib/format.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
 
 import { IToolModule } from '../_types_/common';
@@ -29,6 +29,17 @@ const definition: Tool = {
   description:
     'Похожие товары (аналоги) для товара ВкусВилл по его id из search_products. Удобно для замены или сравнения.',
   inputSchema,
+};
+
+/** Analogs list: `{product_id,total,products[]}`. */
+const formatAnalogsList = (data: any): string => {
+  const items = data?.products || [];
+  if (!items.length) {
+    return 'Аналоги не найдены.';
+  }
+  const header = `Аналоги товара ${data?.product_id ?? ''} — найдено ${data?.total ?? items.length}:`.trim();
+  const blocks = items.map((p: any, i: number) => formatProductShort(p, i + 1));
+  return [header, '', ...blocks].join('\n\n');
 };
 
 export const getProductAnalogsModule: IToolModule = {

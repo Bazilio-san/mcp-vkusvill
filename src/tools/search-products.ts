@@ -21,9 +21,7 @@ const inputSchema: IToolInputSchema = {
     },
     sort: {
       type: 'string',
-      description:
-        'Сортировка: popularity — по популярности (по умолчанию), rating — по рейтингу, ' +
-        'price_asc — дешевле сначала, price_desc — дороже сначала, new — новинки',
+      description: `Сортировка: popularity — по популярности (по умолчанию), rating — по рейтингу, price_asc — дешевле сначала, price_desc — дороже сначала, new — новинки`,
       enum: ['popularity', 'rating', 'price_asc', 'price_desc', 'new'],
     },
     vvonly: {
@@ -39,9 +37,7 @@ const inputSchema: IToolInputSchema = {
 const definition: Tool = {
   name: 'search_products',
   title: 'Поиск товаров ВкусВилл',
-  description:
-    'Поиск товаров ВкусВилл по текстовому запросу. Возвращает список товаров с ценой, рейтингом, весом, ' +
-    'ссылкой и идентификаторами (id, xml_id). По 10 товаров на странице — для следующих результатов увеличивайте page.',
+  description: `Поиск товаров ВкусВилл по текстовому запросу. Возвращает список товаров с ценой, рейтингом, весом, ссылкой и идентификаторами (id, xml_id). По 10 товаров на странице — для следующих результатов увеличивайте page.`,
   inputSchema,
 };
 
