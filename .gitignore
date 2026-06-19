@@ -93,3 +93,4 @@ preferred-language.txt
 /mcp-ext-apps/
 .agents/
 .qwen/
+/swagger/openapi.yaml
