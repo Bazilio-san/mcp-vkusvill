@@ -1,407 +1,110 @@
-# CLAUDE.md
+# mcp-vkusvill
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI agents working in this repository.
 
 ## What This Is
 
-An MCP (Model Context Protocol) server built on the `fa-mcp-sdk` framework. It exposes tools, prompts, and resources to AI agents via STDIO or HTTP/SSE transports.
+An MCP (Model Context Protocol) server built on the `fa-mcp-sdk` framework. It **proxies the official
+VkusVill MCP API** (`https://mcp001.vkusvill.ru/mcp`) and reformats its raw JSON responses into
+readable Markdown. Exposed over STDIO or HTTP/SSE transports.
 
-## Commands
+The upstream is itself an MCP server (JSON-RPC 2.0 over Streamable HTTP, anonymous — no auth). This
+server performs the MCP handshake with it, forwards `tools/call`, and formats the result.
 
-```bash
-# Build & run
-yarn build                 # tsc
-yarn cb                    # clean dist/ + build
-yarn start                 # node dist/src/start.js (HTTP mode)
-node dist/src/start.js stdio   # STDIO mode (Claude Desktop)
+## Tools
 
-# Lint & typecheck
-yarn lint                  # oxlint
-yarn lint:fix              # oxlint --fix
-yarn format                # oxfmt --check
-yarn format:fix            # oxfmt
-yarn typecheck             # tsc --noEmit
+All 7 upstream tools are proxied (our tool → upstream tool):
 
-# Tests
-yarn test                  # jest (all tests)
-yarn test:mcp              # STDIO transport tests
-yarn test:mcp-http         # HTTP transport tests
-yarn test:mcp-sse          # SSE transport tests
-npx jest tests/path/to/file.test.ts   # single test file
+| Our tool | Upstream tool | Purpose |
+|----------|---------------|---------|
+| `search_products` | `vkusvill_products_search` | Text search (price, rating, weight, id, xml_id, url) |
+| `get_product_details` | `vkusvill_product_details` | Composition, КБЖУ, allergens, shelf life, manufacturer |
+| `get_product_analogs` | `vkusvill_product_analogs` | Similar / replacement products |
+| `get_discounts` | `vkusvill_products_discount` | Promo items with old→new price |
+| `find_shops` | `vkusvill_shops` | Shops + filter reference (region/city/metro ids) |
+| `search_recipes` | `vkusvill_recipes` | Recipes (ingredients, steps, nutrition) + filter reference |
+| `create_cart_link` | `vkusvill_cart_link_create` | Build a shareable cart link from `{xml_id, quantity}` |
 
-# Utilities
-yarn check-llm             # Validate OpenAI API key for Agent Tester
-yarn generate-token        # JWT token generator UI
-
-# JWT token generation (CLI)
-node scripts/generate-jwt.js -u <username> -ttl <duration> [-s <service>] [-p <params>]
-# duration: <N>s | <N>m | <N>d | <N>y
-# example: node scripts/generate-jwt.js -u admin -ttl 30d -s my-mcp -p "role=admin;team=ops"
-
-# JWT generation API (HTTP endpoint, requires webServer.genJwtApiEnable: true)
-# POST /gen-jwt  {"username":"user","ttl":"30d","service":"svc","params":"key=val"}
-
-yarn consul:unreg          # deregister from Consul
-```
-
-## JWT Token Generation (Skill /gen-jwt)
-
-Generate JWT tokens for MCP server authentication using the `/gen-jwt` skill. 
-Triggers: user asks to generate/create a JWT token, mentions "jwt", "token for user", "токен для", "сгенерируй токен для". 
-
-**Start/stop the server**: `yarn build && yarn start`. Stop with Ctrl+C. Port is in `config/default.yaml` → `webServer.port`. Force stop: `node scripts/kill-port.js <port>`.
-
-**Server endpoints** (HTTP mode): `/mcp/*` (MCP protocol), `/docs` (Swagger UI), `/admin` (token generator), `/health`, `/agent-tester` (chat UI for testing tools).
+Tool-level upstream errors arrive as `{ok:false, error}`; they are surfaced to the LLM via
+`asTextError` (not thrown as JSON-RPC errors).
 
 ## Architecture
 
 ```
 src/
-├── start.ts                  # Entry point — calls initMcpServer()
-├── _types_/custom-config.ts  # Custom AppConfig extensions
+├── start.ts                  # Entry point — assembles McpServerData, calls initMcpServer()
+├── _types_/
+│   ├── common.d.ts           # IToolModule interface
+│   └── custom-config.ts      # Custom AppConfig extensions
+├── lib/
+│   ├── vkusvill-client.ts    # MCP client to the upstream (handshake, retry, SSE/JSON parse, errors)
+│   └── format.ts             # Markdown formatters for every payload type (the core value)
 ├── tools/
-│   ├── tools.ts              # Tool[] definitions (name, inputSchema)
-│   └── handle-tool-call.ts   # Tool execution logic (switch on name)
+│   ├── tools.ts              # Registry + central dispatcher (handleToolCall)
+│   ├── search-products.ts    # One file per tool: definition + handler + optional prompt (IToolModule)
+│   ├── get-product-details.ts
+│   ├── get-product-analogs.ts
+│   ├── get-discounts.ts
+│   ├── find-shops.ts
+│   ├── search-recipes.ts
+│   └── create-cart-link.ts
 ├── prompts/
 │   ├── agent-brief.ts        # Short agent description
 │   ├── agent-prompt.ts       # Full system prompt
-│   └── custom-prompts.ts     # Additional IPromptData[]
-├── api/router.ts             # REST endpoints (tsoa decorators)
-└── custom-resources.ts       # MCP resources (IResourceData[])
+│   └── tool-prompts.ts       # Aggregates per-tool prompts for the tool_prompt MCP prompt
+└── api/router.ts             # REST endpoints (tsoa decorators) — health only
 
 config/
-├── default.yaml              # Base config
-├── development.yaml          # Dev overrides
-├── production.yaml           # Prod overrides
-├── local.yaml                # Local secrets (gitignored)
-└── custom-environment-variables.yaml  # Env var → config mapping
+├── default.yaml              # Base config (incl. accessPoints.vkusvillMcp — the upstream host)
+├── development.yaml / production.yaml   # Env overrides
+├── local.yaml                # Local secrets / dev overrides (gitignored)
+└── custom-environment-variables.yaml    # Env var → config mapping
 
-tests/mcp/                    # MCP tool tests (STDIO, HTTP, SSE)
+tests/mcp/                    # MCP tool tests (STDIO, HTTP, SSE) — test-cases.js is shared
 ```
 
-This is the default structure generated by the CLI. It can be modified or extended as needed — add directories, split files, introduce layers (services, repositories, etc.) based on the MCP server's requirements.
+### Conventions
 
-### Key Patterns
+- **One file per tool.** Each `src/tools/<tool>.ts` exports an `IToolModule` (definition + handler +
+  optional prompt). `tools.ts` collects them into the `tools` array and dispatches `tools/call`.
+- **All formatting lives in `src/lib/format.ts`.** Handlers call the upstream via the client, then a
+  formatter. They write against the **real** API response shapes (objects for price/rating/weight,
+  `properties[]` for product composition/nutrition, numeric `nutritional` for recipes).
+- **ESM imports** from `fa-mcp-sdk` and local modules use `.js` extensions.
+- **No `+` string concatenation** for multi-line strings — use template literals.
 
-```typescript
-// All imports from fa-mcp-sdk use .js extensions (ESM)
-import {
-  initMcpServer, appConfig, formatToolResult, ToolExecutionError,
-  IToolHandlerParams, TToolHandlerResponse,
-} from 'fa-mcp-sdk';
+### Upstream connection
 
-// Tool handler receives headers and JWT payload; returns TToolHandlerResponse
-// ({ content: [...] } or { structuredContent: {...} }, driven by appConfig.mcp.tools.answerAs).
-export const handleToolCall = async (params: IToolHandlerParams): Promise<TToolHandlerResponse> => {
-  const { name, arguments: args, headers, payload, transport } = params;
-  // payload.user available when JWT auth enabled
-};
+The upstream host is declared in `config/default.yaml` under `accessPoints.vkusvillMcp.host`
+(`noConsul: true`). The client reads it via `appConfig.accessPoints.vkusvillMcp.host` and falls back
+to the same URL if missing.
 
-// REST API uses tsoa decorators
-@Route('api') export class MyController { @Get('endpoint') ... }
-```
-
-### Config System
-
-Priority: environment variables > local.yaml > {NODE_ENV}.yaml > default.yaml. Access via `appConfig` from `fa-mcp-sdk`. Extend the type in `src/_types_/custom-config.ts`.
-
-### Auth Order
-
-When multiple auth methods configured, detection from `Authorization` header:
-1. `permanentServerTokens` — static tokens (O(1) lookup)
-2. `basic` — base64 username:password
-3. `jwtToken` — standard signed JWT, HS256 (optional IP restriction via `isCheckIP` + `ip` field in payload; legacy `<expire>.<hex>` tokens still accepted for backward compatibility)
-4. `custom` — user-defined validator (fallback)
-
-## Framework Documentation
-
-Detailed fa-mcp-sdk docs are in `FA-MCP-SDK-DOC/`:
-
-| File | When to Read |
-|------|-------------|
-| `00-FA-MCP-SDK-index.md` | Quick reference, all exports, project structure |
-| `01-getting-started.md` | `initMcpServer()`, `McpServerData`, `IToolHandlerParams` |
-| `02-1-tools-and-api.md` | Tool definitions, REST API with tsoa |
-| `02-2-prompts-and-resources.md` | Prompts, resources, `ITransportContext` |
-| `03-configuration.md` | `appConfig`, YAML config, DB, cache |
-| `04-authentication.md` | JWT, Basic auth, permanent tokens |
-| `05-ad-authorization.md` | AD group authorization, AD config |
-| `06-utilities.md` | Error handling, logging, Consul |
-| `07-testing-and-operations.md` | Test clients (STDIO, HTTP, SSE, Streamable HTTP) |
-| `08-agent-tester-and-headless-api.md` | Agent Tester, Headless API, structured logging, automated testing, MCP Apps mode (capability negotiation, `appCalls[]`, widget rendering, App Inspector) |
-| `09-database.md` | PostgreSQL sugar layer (`queryMAIN`, `execMAIN`, upserts, `mergeByBatch`), `pgvector`, secondary DBs |
-| `10-mcp-apps.md` | Building / extending MCP Apps (UI-augmented tools) — protocol contract, SDK surface, patterns, pitfalls |
-| `11-public-contract.md` | Formal SDK public contract — transports, endpoints, JWT claims, tool/prompt/resource format, error mapping, headers, semver & deprecation policy |
-| `12-implementation-standard.md` | Corporate MCP server implementation standard (Avatar profile over MCP 2025-11-25) — tool side-effects & risk level, error codes, limits, observability, deprecation, compliance checklist |
-
-## Development and Testing Through Agent Tester
-
-The Agent Tester validates the full agent experience: how the LLM interprets tool descriptions, selects tools, passes arguments, and presents results. → See `08-agent-tester-and-headless-api.md` for complete API reference.
-
-### Prerequisites
-
-Agent Tester requires an OpenAI API key to call the LLM. Before using it, ensure the following configuration is in place:
-
-**Option A** — environment variables (`.env` file or shell):
-```
-AGENT_TESTER_ENABLED=true
-AGENT_TESTER_OPENAI_API_KEY=sk-...
-```
-
-**Option B** — `config/default.yaml` (or `local.yaml`):
-```yaml
-agentTester:
-  enabled: true
-  openAi:
-    apiKey: sk-...
-```
-
-**IMPORTANT for Claude Code**: When the development prompt or instructions mention testing with Headless API or Agent Tester, run `yarn check-llm` before starting any Agent Tester work. This script validates that the OpenAI API key is configured and functional. If it fails (exit code 1 = key missing, exit code 2 = key invalid or API error), inform the user about the issue and ask them to fix the configuration before proceeding with Agent Tester tests. See `08-agent-tester-and-headless-api.md` → "LLM Availability Check" for details.
-
-**Disabled state**: If `agentTester.enabled` is `false`, the server returns HTTP 404 on any `/agent-tester/*` request (including the Headless API). When you receive this 404 response, do **NOT** enable Agent Tester yourself — only inform the developer that Agent Tester may be disabled, and that it can be enabled via `agentTester.enabled: true` in `config/local.yaml` or ENV `AGENT_TESTER_ENABLED=true`. The developer decides whether to enable it. However, if the developer's prompt or instructions explicitly state that you should not mention Agent Tester enablement, respect that and do not bring it up.
-
-### What Gets Tested
-
-- **Tool architecture** — correct tool decomposition (split or merge?)
-- **Agent prompt** — LLM follows desired conversation style
-- **Tool descriptions** — LLM understands when and why to call each tool
-- **Parameter design** — names, types, required/optional intuitive for LLM
-- **Response format** — `formatToolResult()` output interpretable by LLM
-- **Error handling** — agent explains errors clearly
-- **Edge cases** — missing params, invalid values, service unavailability
-
-### Development Workflow
-
-Follow this sequence when building or extending an MCP server:
-
-#### Step 1: Design Tool Set
-
-Define the tools your server will expose. For each tool, decide:
-- **Name** — clear, action-oriented (e.g., `get_currency_rate`, `search_documents`)
-- **Description** — what the tool does and when to use it (the LLM reads this to decide whether to call it)
-- **Parameters** — name, type, required/optional, description including defaults and constraints
-- **Response structure** — what data the tool returns
-
-Write definitions in `src/tools/tools.ts`. → See `02-1-tools-and-api.md`.
-
-#### Step 2: Write Code
-
-- `src/tools/handle-tool-call.ts` — tool execution logic (switch on tool name)
-- `src/custom-resources.ts` — MCP resources (if needed)
-- `src/api/router.ts` — REST API endpoints with tsoa decorators (if needed)
-- `config/default.yaml` — configuration (DB, auth, access points, etc.)
-
-→ See `01-getting-started.md`, `02-1-tools-and-api.md`, `03-configuration.md`.
-
-#### Step 3: Write Agent Prompt and Brief
-
-- `src/prompts/agent-brief.ts` — short agent description (shown in tool listings)
-- `src/prompts/agent-prompt.ts` — full system prompt shaping LLM behavior, tool usage logic, and response style
-- `src/prompts/custom-prompts.ts` — additional prompts (if needed)
-
-The agent prompt is critical — it determines how the LLM uses your tools. → See `02-2-prompts-and-resources.md`.
-
-#### Step 4: Write Tests
-
-Test files in `tests/mcp/`:
-- `test-cases.js` — shared test cases (tool names, arguments, expected results). **This is the main file to edit** when adding tools.
-- `test-http.js` — HTTP transport tests
-- `test-sse.js` — SSE transport tests
-- `test-stdio.js` — STDIO transport tests
-
-What to cover in test cases:
-- Happy path for each tool
-- Error cases (invalid params, missing required fields, service errors)
-- Auth flows (if auth enabled)
-
-Run tests per transport:
-```bash
-yarn test:mcp              # STDIO
-yarn test:mcp-http         # HTTP
-yarn test:mcp-sse          # SSE
-```
-
-→ See `07-testing-and-operations.md`.
-
-#### Step 5: Build, Lint, Verify
+## Commands
 
 ```bash
-yarn cb                    # Clean build — fix all compilation errors
-yarn lint:fix              # Oxlint — fix all lint errors
-yarn format:fix            # Oxfmt — format the project
-yarn typecheck             # tsc --noEmit — fix all type errors
-yarn start                 # Start server — verify clean startup, no runtime errors
+yarn cb                    # clean dist/ + build (tsc)
+yarn start                 # node dist/src/start.js (HTTP mode)
+node dist/src/start.js stdio   # STDIO mode
+
+yarn lint:fix              # oxlint --fix
+yarn format:fix            # oxfmt
+yarn typecheck             # tsc --noEmit
+
 yarn test:mcp              # STDIO transport tests
 yarn test:mcp-http         # HTTP transport tests
 yarn test:mcp-sse          # SSE transport tests
+
+yarn check-llm             # Validate OpenAI API key for Agent Tester
+node scripts/kill-port.js <port>   # Force-stop the server (port from config/default.yaml → webServer.port)
 ```
 
-**Goal**: zero build errors, zero lint errors, zero type errors, clean server startup, all tests green.
+## Config System
 
-#### Step 6: Iterative Refinement via Agent Tester
+Priority: environment variables > `local.yaml` > `{NODE_ENV}.yaml` > `default.yaml`. Access via
+`appConfig` from `fa-mcp-sdk`. Extend the type in `src/_types_/custom-config.ts`.
 
-Once the server starts cleanly, move to agent-level testing. 
-Use `gpt-5.2` as the model in Agent Tester — it provides the best balance of tool-calling accuracy and reasoning for MCP testing. Send real messages through the Headless API, observe how the LLM uses your tools, and refine:
+## Agent Tester
 
-- **Tool descriptions** — if the LLM picks the wrong tool or misunderstands its purpose
-- **Parameter schemas** — if the LLM sends wrong types or misses required params
-- **Agent prompt** — if the LLM doesn't follow the desired conversation style
-- **Handler logic** — if tool results confuse the LLM or lack needed information
-- **Error messages** — if failures produce unhelpful agent responses
-
-Each iteration: observe → diagnose root cause → fix → `yarn cb && yarn start` → re-test.
-
-#### Step 7: Development Report
-
-When all tools are implemented, tests pass, and agent testing is complete, create `claudedocs/dev-report.md`:
-
-- **What was built** — list of tools, prompts, resources, REST endpoints with brief descriptions
-- **Architecture decisions** — why tools were decomposed a certain way, key design choices
-- **Agent prompt rationale** — what behavior the prompt enforces and why
-- **Test coverage** — which scenarios were tested, which transports
-- **Agent Tester findings** — what was refined during iterative testing (descriptions, schemas, prompt adjustments) and why
-- **Configuration** — required config keys, environment variables, external dependencies
-- **Known limitations** — edge cases not covered, planned improvements
-
-### Testing via Headless API (Primary Method)
-
-Direct HTTP calls — no browser needed. Provides structured trace data.
-
-```
-1. yarn cb && yarn start
-2. GET  /agent-tester/api/mcp/status         → verify tools loaded
-3. POST /agent-tester/api/chat/test           → send message, get response + trace
-4. Analyze trace: correct tool? correct args? expected result?
-5. Check trace.system_prompt_sent             → verify exact prompt sent to LLM
-6. If unclear → retry with ?verbose=true
-7. If issue found → fix code → rebuild → re-test
-```
-
-Query params: `?verbose=true` (LLM details per turn), `?maxResultChars=8000`, `?maxTraceChars=100000`.
-
-**Prompt control in headless requests.** The `agentPrompt` field sets the system prompt sent to the LLM — when provided, it **replaces** the MCP server's built-in `agent_prompt`. Use it to iterate on prompt variations: read the current `AGENT_PROMPT` from `src/prompts/agent-prompt.ts`, send modified versions via `agentPrompt`, evaluate responses, and write the best variant back. The `customPrompt` field appends additional instructions. The trace response includes `system_prompt_sent` — the exact prompt the LLM received. → See `08-agent-tester-and-headless-api.md` for full prompt assembly logic and examples.
-
-Structured JSON logging: `yarn start --log-json` or `AGENT_TESTER_LOG_JSON=true yarn start` — emits per-event JSON on stdout.
-
-### Playwright Testing (Fallback — UI Only)
-
-Use only for UI-specific verification (page layout, DOM interaction). For tool testing, use the headless API.
-
-```
-browser_navigate → http://localhost:<port>/agent-tester
-browser_snapshot → verify page loaded
-browser_type    → message input
-browser_click   → send button
-browser_wait_for → assistant response
-browser_snapshot → verify response
-```
-
-### Testing Log
-
-Maintain `claudedocs/test-log.md` during automated testing — a chronological narrative of actions, expectations, results, and diagnoses.
-
-```markdown
-# Agent Tester — Test Log
-
-## Session: 2025-08-15
-
-### Iteration 1
-
-Server running on port 9876. 3 tools detected.
-
-**Testing get_currency_rate — basic case**
-Sending: "What is the exchange rate of EUR to USD?"
-Expected: numeric rate, mentions EUR and USD.
-Received: "The current EUR/USD exchange rate is 1.0847"
-Tools used: get_currency_rate
-Result: OK
-
-**Testing get_currency_rate — invalid currency**
-Sending: "Get rate for XYZ to USD"
-Expected: error message about unknown currency.
-Received: "I couldn't find the exchange rate. The currency code XYZ is not recognized."
-Tools used: get_currency_rate
-Result: OK
-
-**Testing get_currency_rate — missing base currency default**
-Sending: "What is the rate for THB?"
-Expected: THB/USD rate (baseCurrency defaults to USD).
-Received: "I need to know which currency you want to convert THB to. Could you specify?"
-Tools used: none
-Result: FAIL — LLM did not use default baseCurrency, asked for clarification instead.
-
-**Diagnosis**: The tool description says "baseCurrency - optional", but doesn't mention the default value.
-**Fix**: Adding "defaults to USD if not specified" to baseCurrency description in tools.ts.
-
-Stopping server. Rebuilding...
-Build OK. Server restarted.
-
-### Iteration 2
-
-**Re-testing get_currency_rate — missing base currency default**
-Sending: "What is the rate for THB?"
-Received: "The current THB/USD exchange rate is 0.0291"
-Tools used: get_currency_rate
-Result: OK — LLM now uses USD as default.
-
-...
-```
-
-This log serves as:
-- **Audit trail** — what was tested, what passed, what failed
-- **Decision record** — why each change was made (e.g., "changed description because LLM didn't understand default value")
-- **Progress tracker** — which tools/scenarios are covered, which remain
-- **Handoff document** — if the session is interrupted, the next session can read the log and continue
-
-## Editing files in `.claude/` (Skill /edit-claude-files)
-
-Any edit or new file under `.claude/**` (SKILL.md, scripts, hooks, agents, `settings.json`) is blocked
-by `settings.json` — direct `Write`/`Edit` will fail. Invoke the `/edit-claude-files` skill, which
-describes the required `scripts/fcp.js` temp-copy protocol.
-
-## MCP Apps Reference Clone (`scripts/clone-mcp-ext-apps.js`)
-
-Shared helper used by the `/mcp-app-create` and `/mcp-app-add-to-server` skills. Clones or refreshes
-`https://github.com/modelcontextprotocol/ext-apps.git` into `./mcp-ext-apps/` at the project root
-(already in `.gitignore`, intentionally persistent so the same checkout is reused across runs).
-
-```bash
-node scripts/clone-mcp-ext-apps.js                    # clone on first run, pull main otherwise
-node scripts/clone-mcp-ext-apps.js --tag latest       # also checkout the latest npm tag
-node scripts/clone-mcp-ext-apps.js --tag v1.7.2       # checkout a specific tag
-node scripts/clone-mcp-ext-apps.js --json             # JSON output (path, ref, commit, version)
-node scripts/clone-mcp-ext-apps.js --list-examples    # include examples/* metadata in JSON
-```
-
-The script never deletes `mcp-ext-apps/`. The two skills above call it before reading sources from
-the cloned tree, so make sure it has run successfully before troubleshooting their behavior.
-
-
-## Formatting
-
-MD lines ≤120 chars. Break at 120. Target 100-120. No short lines (60-80). Fill to ~120.
-Exceptions: URLs, code blocks, tables — no wrap.
-
-### Visual line breaks in lists and legends
-
-When a sentence introduces a set of short parallel items (a legend, a status key, an enumeration of short clauses —
-e.g. `Обозначения:`, `Стек:`), render each item on its own visual line instead of running them together on one line:
-
-- Put the introducing phrase (`Обозначения:`) on its own line, ended with a hard break.
-- Put each item on its own line, each ended with a Markdown hard break.
-- Inside a bullet or paragraph, a labeled sub-clause (`**Осознанно отложено:** …`, `**Why:** …`, `**How to apply:** …`)
-  starts on a new visual line: end the preceding line with a hard break so the label is not glued to the prior sentence.
-
-The hard break is a trailing backslash `\` — use it as the default, because it is visible in the source and survives
-editors that trim trailing whitespace. Two trailing spaces are an equivalent fallback. These hard-broken lines are
-intentionally short and are **exempt** from the "fill to ~120 / no short lines" rule above. The ≤120-char soft wrap
-still applies to the continuation lines of a long item.
-
-## Strings (JS)
-
-Never build a string with `+` concatenation. Whenever a string would overflow the 120-column limit and needs to span
-several source lines, write it as a single multi-line template literal (backticks) instead of joining `'…' + '…' +`
-fragments. Use `${expr}` interpolation rather than `'…' + value` to splice values in. Short single-line strings that
-fit within 120 columns stay as plain quotes. For user-facing text where the exact spacing matters (no stray line
-breaks), keep the wording on one logical line inside the backticks even if that line is long — the formatter leaves
-template-literal contents untouched, which is exactly why they replace `+` wrapping.
+A built-in chat UI + headless API at `/agent-tester` drives the tools through an LLM (requires an
+OpenAI-compatible key in `agentTester.openAi`). Run `yarn check-llm` before using it. Headless test
+endpoint: `POST /agent-tester/api/chat/test`. Detailed SDK docs live in `FA-MCP-SDK-DOC/`.
