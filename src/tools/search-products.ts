@@ -4,12 +4,12 @@ import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
 import { formatProductsList } from '../lib/format.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
-import { IToolModule, JSON_SCHEMA_2020_12 } from './tool-module.js';
+
+import { IToolModule } from '../_types_/common';
 
 /** search_products → upstream vkusvill_products_search. */
 
 const inputSchema: IToolInputSchema = {
-  $schema: JSON_SCHEMA_2020_12,
   type: 'object',
   properties: {
     query: { type: 'string', description: 'Поисковый запрос, например «молоко 3.2» или «хлеб бездрожжевой»' },

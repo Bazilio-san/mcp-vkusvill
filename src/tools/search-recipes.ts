@@ -4,12 +4,12 @@ import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
 import { formatRecipesList } from '../lib/format.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
-import { IToolModule, JSON_SCHEMA_2020_12 } from './tool-module.js';
+
+import { IToolModule } from '../_types_/common';
 
 /** search_recipes → upstream vkusvill_recipes. */
 
 const inputSchema: IToolInputSchema = {
-  $schema: JSON_SCHEMA_2020_12,
   type: 'object',
   properties: {
     query: {

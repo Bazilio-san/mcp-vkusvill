@@ -4,12 +4,12 @@ import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
 import { formatProductsList } from '../lib/format.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
-import { IToolModule, JSON_SCHEMA_2020_12 } from './tool-module.js';
+
+import { IToolModule } from '../_types_/common';
 
 /** get_discounts → upstream vkusvill_products_discount. */
 
 const inputSchema: IToolInputSchema = {
-  $schema: JSON_SCHEMA_2020_12,
   type: 'object',
   properties: {
     discount_type: {

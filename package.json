@@ -1,7 +1,7 @@
 {
   "name": "mcp-vkusvill",
   "productName": "MCP VKUSVILL",
-  "version": "0.1.6",
+  "version": "0.1.9",
   "description": "MCP server for integration with VkusVill",
   "type": "module",
   "main": "dist/src/start.js",

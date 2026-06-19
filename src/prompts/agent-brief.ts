@@ -4,6 +4,5 @@
  * LLM doesn't see tools at this level
  */
 
-export const AGENT_BRIEF =
-  'Помощник по магазину ВкусВилл: поиск товаров и акций, состав и КБЖУ, аналоги, поиск магазинов, ' +
-  'рецепты и сборка ссылки на корзину.';
+export const AGENT_BRIEF =`assistant for shopping for groceries and household items: 
+search for products and promotions, composition and KBJU, analogues, store search, recipes and assembly of a link to the cart.`;

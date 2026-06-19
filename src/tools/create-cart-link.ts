@@ -4,12 +4,12 @@ import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
 import { formatCartLink } from '../lib/format.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
-import { IToolModule, JSON_SCHEMA_2020_12 } from './tool-module.js';
+
+import { IToolModule } from '../_types_/common';
 
 /** create_cart_link → upstream vkusvill_cart_link_create. */
 
 const inputSchema: IToolInputSchema = {
-  $schema: JSON_SCHEMA_2020_12,
   type: 'object',
   properties: {
     items: {
