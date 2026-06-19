@@ -32,9 +32,32 @@ Generates JWT tokens for MCP server authentication via `scripts/generate-jwt.js`
 
 ---
 
-### `/upgrade-guide` — FA-MCP-SDK Upgrade Guide
+### `/change-log` — CHANGELOG Generator
 
-Generates a migration guide for upgrading the `fa-mcp-sdk` dependency in this project. Analyzes diffs in:
+Generates a [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) entry covering changes between
+the last version recorded in `CHANGELOG.md` and either the current `package.json` version or an
+explicit TO version. Only substantial changes are included; cosmetic/style/internal-tooling churn is
+filtered out. Sections: `Breaking` / `Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`.
+
+- **Launch**: **command-only** via `/change-log`. `disable-model-invocation: true`.
+- **Input**: optional `[to-version]` argument; defaults to the current `package.json` version.
+- **Output**: a new entry prepended to `CHANGELOG.md` at the repo root.
+
+**Examples:**
+
+```
+/change-log
+/change-log 0.2.0
+```
+
+---
+
+### `/upgrade-sdk` — FA-MCP-SDK Upgrade
+
+Upgrades the `fa-mcp-sdk` dependency end-to-end: analyzes the version diff, presents an actionable
+execution plan, gets confirmation, then applies the upgrade automatically (deps, configs, code),
+asking inline for any choices it needs. Falls back to a manual checklist only for items it genuinely
+cannot perform. Analyzes diffs in:
 
 - `config/*.yaml` — new/removed/changed keys and defaults (correlates `default.yaml`, `_local.yaml`, `local.yaml`)
 - `cli-template/` — `package.json` (new deps only), `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `CLAUDE.md`, `deploy/`,
@@ -46,22 +69,18 @@ Generates a migration guide for upgrading the `fa-mcp-sdk` dependency in this pr
 By default, versions and commit hashes refer to **this project** — the skill resolves them to the pinned SDK version
 via `git show <ref>:package.json`. To reference SDK versions/commits directly, mention "SDK" explicitly.
 
-- **Launch**: by command `/upgrade-guide` or by trigger phrases ("обновить sdk", "upgrade sdk", "migration guide",
-  "обновление fa-mcp-sdk")
-- **Output**: `upgrade-guide-<old>-to-<new>.md` in project root
+- **Launch**: **command-only** via `/upgrade-sdk` or by trigger phrases ("обновить sdk", "upgrade sdk",
+  "обновление fa-mcp-sdk", "обнови sdk")
+- **Output**: the upgrade applied to the project (deps, configs, code) + a report of what changed
 
 **Examples:**
 
 ```
-/upgrade-guide                                               # current SDK -> latest SDK
-/upgrade-guide 1.2.3                                         # project version 1.2.3 -> latest SDK
-/upgrade-guide 1.2.3 1.2.7                                   # project versions
-/upgrade-guide abc1234 def5678                               # project commits
-/upgrade-guide from SDK version 0.1.30                       # SDK versions directly -> latest SDK
-/upgrade-guide from SDK version 0.1.30 to SDK version 0.5.0  # SDK versions directly
-/upgrade-guide from SDK commit abc1234 to SDK commit def5678 # SDK commits directly
-/upgrade-guide 1.2.3 1.2.7 in Russian                        # output guide in Russian
-/upgrade-guide 1.2.3 1.2.7 на русском                        # same, via Russian phrasing
+/upgrade-sdk                                               # current project SDK -> latest SDK
+/upgrade-sdk 1.2.3                                         # from project version 1.2.3 -> latest SDK
+/upgrade-sdk 1.2.3 1.2.7                                   # between project versions
+/upgrade-sdk from SDK version 0.1.30 to SDK version 0.5.0  # SDK versions directly
+/upgrade-sdk 1.2.3 1.2.7 на русском                        # report in Russian
 ```
 
 ---

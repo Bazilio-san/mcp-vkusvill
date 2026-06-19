@@ -52,6 +52,31 @@ for the MAJOR / MINOR / PATCH rules.
 
 ---
 
+## [0.1.14] - 2026-06-20
+
+### Breaking
+
+- Remove example REST endpoint `GET /api/example`; only `GET /api/health` remains on the router.
+- Remove scaffold MCP resources `custom-resource://resource1` and `custom-resource://logo.png`, plus the example
+  custom prompt — clients must stop requesting them.
+
+### Added
+
+- Proxy all 7 VkusVill MCP tools with Markdown-formatted output: `search_products`, `get_product_details`,
+  `get_product_analogs`, `get_discounts`, `find_shops`, `search_recipes`, `create_cart_link`.
+- Add the upstream MCP client (handshake, SSE/JSON parsing, retry) and Markdown formatters for every payload type;
+  upstream `{ok:false}` tool errors surface to the LLM via `asTextError` instead of throwing.
+- Add config key `config.accessPoints.vkusvillMcp.host` (default `https://mcp001.vkusvill.ru/mcp`, `noConsul: true`)
+  declaring the upstream MCP host the server proxies.
+
+### Changed
+
+- Point the Swagger server URL to `https://mcp-vkusvill.time-gold.com` and set `config.uiColor.primary` to green.
+- Drop the unused `config.ad` (Active Directory/LDAP) and `config.db.postgres` scaffold blocks from
+  `config/default.yaml`; operators with overrides for those keys can remove them.
+
+---
+
 ## [0.1.0] - YYYY-MM-DD
 
 Initial release.

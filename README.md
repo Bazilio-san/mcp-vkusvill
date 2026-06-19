@@ -1,108 +1,142 @@
 # MCP VKUSVILL
 
-MCP server for integration with VkusVill
+MCP server for VkusVill. It proxies the official VkusVill MCP API and reformats its raw JSON into
+readable Markdown, letting AI agents search products, look up composition and nutrition, find shops,
+browse recipes, and build shareable cart links.
 
-## Install & Run
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![MCP](https://img.shields.io/badge/MCP-Server-DA7857)](https://modelcontextprotocol.io/)
+[![fa-mcp-sdk](https://img.shields.io/badge/built%20with-fa--mcp--sdk-526CFE)](https://github.com/Bazilio-san/fa-mcp-sdk)
 
-### Quick Start
+## Quick Links
+
+- [Tools](#tools-7)
+- [Quick Start](#quick-start)
+- [MCP Client Integration](#mcp-client-integration)
+- [Key Features](#key-features)
+- [Configuration](#configuration-basics)
+- [Build & Run](#build--run)
+- [Authentication](#authentication)
+- [Admin Panel](#admin-panel)
+- [Agent Tester](#agent-tester)
+- [Claude Code Skills](#claude-code-skills)
+
+## Overview
+
+This server sits between an AI agent and the official VkusVill MCP API
+(`https://mcp001.vkusvill.ru/mcp`). The upstream is itself an MCP server (JSON-RPC 2.0 over
+Streamable HTTP, anonymous — no credentials). This proxy performs the MCP handshake with it,
+forwards `tools/call` requests, and converts the raw JSON responses into Markdown that is easy for
+an LLM to read and present. It exposes 7 tools over HTTP/SSE or STDIO. Use it when you want VkusVill
+grocery data inside an MCP-capable assistant.
+
+## Tools (7)
+
+All tools wrap one upstream VkusVill tool each and return formatted Markdown. Tool-level upstream
+failures are surfaced to the LLM in-conversation (not thrown as protocol errors).
+
+### Products
+
+| Tool                   | Description                                                            |
+|------------------------|-----------------------------------------------------------------------|
+| `search_products`      | Text search for products (price, rating, weight, id, xml_id, url).    |
+| `get_product_details`  | Composition, КБЖУ (nutrition), allergens, shelf life, manufacturer.   |
+| `get_product_analogs`  | Similar / replacement products for a given product id.                |
+| `get_discounts`        | Promo items with old → new price.                                     |
+
+### Shops
+
+| Tool          | Description                                                                      |
+|---------------|---------------------------------------------------------------------------------|
+| `find_shops`  | Shops (address, hours, phone, features) plus region/city/metro filter reference. |
+
+### Recipes
+
+| Tool             | Description                                                            |
+|------------------|-----------------------------------------------------------------------|
+| `search_recipes` | Recipes (ingredients, steps, nutrition) plus filter reference.        |
+
+### Cart
+
+| Tool                | Description                                                  |
+|---------------------|-------------------------------------------------------------|
+| `create_cart_link`  | Build a shareable cart link from `{xml_id, quantity}` items. |
+
+Project-specific details on the proxy and formatting: [Upstream Proxy](./readme-docs/upstream-proxy.md).
+
+## Quick Start
+
 ```bash
-# Install
 npm install
-
-# Configure (copy config/local.yaml from config/_local.yaml)
-# Add database credentials
-
-# Build
 npm run build
-
-# Run (STDIO mode for Claude Desktop)
-npm start
+npm start                       # HTTP mode, port 9048
 ```
 
-### Test Run
+For STDIO mode (Claude Desktop direct spawn):
+
 ```bash
-# Unit tests
-npm test
-
-# MCP protocol tests
-npm run test:mcp        # STDIO mode
-npm run test:mcp-http   # HTTP mode
-npm run test:mcp-simple # Simple test
+node dist/src/start.js stdio
 ```
 
-### Dual Transport System
+Verify the HTTP server is up:
 
-**STDIO Mode** (default for Claude Desktop):
-- Direct stdin/stdout communication
-- Optimal for Claude Desktop integration
-- No network ports required
+```bash
+curl http://localhost:9048/health
+```
 
-**HTTP Mode** (web integration):
-- HTTP server with Server-Sent Events (SSE)
-- Home page with server status at `http://localhost:9048/`
-- Health check endpoint at `/health`
-- Direct JSON-RPC 2.0 endpoint at `/mcp`
+No configuration is required to talk to the upstream — it is anonymous. A `config/local.yaml`
+(gitignored) is only needed when you enable MCP-server authentication or the Agent Tester LLM.
 
+## MCP Client Integration
 
-## Features
+By default the MCP server's own authentication is **off** (`webServer.auth.enabled: false`), so no
+auth header is needed. If you enable it, pass a JWT via the standard `Authorization: Bearer` header
+(generate one with the `/gen-jwt` skill or `node scripts/generate-jwt.js`).
 
+### Claude Code
 
-
-## MCP Tools
-
-
-
-## MCP Prompts
-
-### `agent_brief`
-Brief description of agent capabilities for agent selection.
-
-### `agent_prompt`
-Complete prompt with instructions.
-
-## MCP Resources
-
-### `staff://agent/brief`
-Same as `agent_brief` prompt. **MIME:** text/plain
-
-### `staff://agent/prompt`
-Same as `agent_prompt` prompt. **MIME:** text/plain
-
-
-## 2. Configuration
-
-**Option A: Configuration File**
-
-**Option B: Environment Variables**
-
-
-## Usage with AI CLIs
-
-The server exposes an HTTP MCP endpoint at `http[s]://<host[:port]>/mcp`. Authentication (when enabled in
-`config/default.yaml` → `webServer.auth`) is passed via the standard `Authorization` header — most commonly a
-JWT Bearer token generated by the `/gen-jwt` skill or by `node scripts/generate-jwt.js`.
-
-### With Claude Code
-
-Add to `~\.claude.json`:
+Add to `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "mcp-vkusvill": {
       "type": "http",
-      "url": "http[s]://<host[:port]>/mcp",
-      "headers": {
-        "Authorization": "Bearer <jwt-token>"
-      }
+      "url": "http[s]://<host[:port]>/mcp"
     }
   }
 }
 ```
 
-### With Claude Desktop
+When server auth is enabled, add a header:
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+```json
+"headers": {
+  "Authorization": "Bearer <jwt-token>"
+}
+```
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`.
+
+**Option 1 — STDIO (local build, direct spawn):**
+
+```json
+{
+  "mcpServers": {
+    "mcp-vkusvill": {
+      "command": "node",
+      "args": ["<path>/mcp-vkusvill/dist/src/start.js", "stdio"],
+      "env": {}
+    }
+  }
+}
+```
+
+**Option 2 — HTTP (remote server via `mcp-remote`):**
 
 ```json
 {
@@ -113,8 +147,6 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
         "-y",
         "mcp-remote@latest",
         "http[s]://<host[:port]>/mcp",
-        "--header",
-        "Authorization: Bearer <jwt-token>",
         "--allow-http",
         "--transport",
         "http-only"
@@ -124,9 +156,9 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 }
 ```
 
-### With Qwen Code
+### Qwen Code
 
-Add to `~\.qwen\settings.json`:
+Add to `~/.qwen/settings.json`:
 
 ```json
 {
@@ -137,8 +169,6 @@ Add to `~\.qwen\settings.json`:
         "-y",
         "mcp-remote@latest",
         "http[s]://<host[:port]>/mcp",
-        "--header",
-        "Authorization: Bearer <jwt-token>",
         "--allow-http",
         "--transport",
         "http-only"
@@ -148,100 +178,134 @@ Add to `~\.qwen\settings.json`:
 }
 ```
 
-> For STDIO transport (local Claude Desktop integration without an HTTP server), run
-> `node <path-to-project>/dist/src/start.js stdio` — see `CLAUDE.md` for details.
+### Codex
 
-## HTTP Mode Endpoints
+Add to `~/.codex/config.toml`:
 
-- **/** - Home page
-- **/health** - Health check
-- **/sse** - Server-Sent Events
-- **/mcp** - JSON-RPC 2.0
+```toml
+[mcp_servers.mcp-vkusvill]
+url = "http[s]://<host[:port]>/mcp"
+```
+
+When server auth is enabled and you connect via `mcp-remote`, add
+`--header "Authorization:Bearer <jwt-token>"` to the args — with **no space** after the `:`.
+
+## Key Features
+
+- **VkusVill MCP proxy** — performs the upstream MCP handshake, forwards `tools/call`, retries once on
+  transient failures with session reset.
+- **Markdown formatting** — every payload (products, nutrition, shops, recipes, cart) is rendered as
+  readable Markdown in `src/lib/format.ts`.
+- **Graceful tool errors** — upstream business errors reach the LLM as in-conversation text, not as
+  protocol crashes.
+- **Dual transport** — HTTP/SSE for web integrations, STDIO for direct Claude Desktop spawn.
+- **Admin Panel** (`/admin`) — JWT / permanent-token generation and inspection UI.
+- **Agent Tester** (`/agent-tester`) — built-in chat UI and headless API to drive the tools via an LLM.
+- **MCP prompts & resources** — `agent_brief`, `agent_prompt`, and `tool_prompt` ship with the server.
+
+## Transports
+
+- **HTTP** — web integrations. Endpoints:
+  - `/mcp` — MCP protocol (JSON-RPC 2.0)
+  - `/health` — health check
+  - `/docs` — Swagger UI (REST, tsoa-generated)
+  - `/admin` — token generator UI
+  - `/agent-tester` — Agent Tester web UI
+  - `/` — home page with server status
+- **STDIO** — for Claude Desktop direct spawn (no network).
+
+Port is set in `config/default.yaml` → `webServer.port` (default `9048`).
+
+## Configuration Basics
+
+Priority: environment variables > `config/local.yaml` > `config/{NODE_ENV}.yaml` > `config/default.yaml`.
+
+| Key                             | Description                                    | Default                          |
+|---------------------------------|------------------------------------------------|----------------------------------|
+| `accessPoints.vkusvillMcp.host` | Upstream VkusVill MCP URL                       | `https://mcp001.vkusvill.ru/mcp` |
+| `webServer.port`                | HTTP server port                               | `9048`                           |
+| `webServer.host`                | Bind address                                   | `127.0.0.1`                      |
+| `webServer.auth.enabled`        | MCP server authorization on/off                | `false`                          |
+| `mcp.transportType`             | Transport (`http` / `stdio`)                   | `http`                           |
+| `mcp.tools.answerAs`            | Response format (`text` / `structuredContent`) | `text`                           |
+| `adminPanel.enabled`            | Admin panel UI on/off                          | `true`                           |
+| `agentTester.enabled`           | Agent Tester UI on/off                         | `true`                           |
+
+Full reference: [Configuration](./readme-docs/configuration.md).
+
+## Build & Run
+
+```bash
+npm run build        # tsc
+npm start            # HTTP server
+node dist/src/start.js stdio   # STDIO mode
+```
+
+Quality and tests:
+
+```bash
+npm run lint:fix       # oxlint --fix
+npm run format:fix     # oxfmt
+npm run typecheck      # tsc --noEmit
+npm run test:mcp       # STDIO transport tests
+npm run test:mcp-http  # HTTP transport tests
+npm run test:mcp-sse   # SSE transport tests
+```
+
+Environment variables:
+
+- `NODE_ENV` — picks the `config/{NODE_ENV}.yaml` overlay.
+
+## Authentication
+
+The upstream VkusVill API is anonymous, so the proxy needs no credentials to fetch data. The
+**server's own** authentication (who may call this MCP server) is configured under `webServer.auth`
+and is **disabled by default**. When enabled it supports permanent server tokens, JWT (Bearer), and
+Basic. Tokens are minted via the Admin Panel, the `/gen-jwt` skill, or `node scripts/generate-jwt.js`.
+
+Methods, JWT modes, and the admin-panel JWT claim requirement: [Authentication](./readme-docs/authentication.md).
+
+## Admin Panel
+
+A web UI at `/admin` generates and inspects tokens. It is enabled by default with
+`authType: [permanentServerTokens, jwtToken]`. When JWT auth is used, the panel only accepts a JWT
+whose payload contains `allow: 'gen-token'`. Setup and usage: [Admin Panel](./readme-docs/admin-panel.md).
+
+## Agent Tester
+
+A built-in chat UI at `/agent-tester` and a headless API at `/agent-tester/api/chat/test` drive the
+tools through an LLM. Requires an OpenAI-compatible key in `agentTester.openAi`; run `npm run check-llm`
+to validate the key first. Full guide: [Testing](./readme-docs/testing.md).
 
 ## Claude Code Skills
 
 The project ships with custom skills in `.claude/skills/`:
 
-| Command                     | Description                                                                  |
-|-----------------------------|------------------------------------------------------------------------------|
-| `/gen-jwt`                  | Generate JWT tokens for MCP server authentication                            |
-| `/upgrade-guide`            | Generate migration guide for `fa-mcp-sdk` upgrades                           |
-| `/feature-prompt-generator` | Turn a feature description into a self-sufficient prompt for an AI CLI       |
-| `/readme-generator`         | Generate structured README.md + satellite `readme-docs/*.md`                 |
-| `/mcp-app-create`           | Scaffold a new MCP App (interactive UI: tool + HTML resource via ext-apps)   |
-| `/mcp-app-add-to-server`    | Enrich existing MCP server tools with interactive UIs (MCP Apps SDK)         |
+| Command                     | Description                                                             |
+|-----------------------------|-------------------------------------------------------------------------|
+| `/gen-jwt`                  | Generate JWT tokens for MCP server authentication.                      |
+| `/upgrade-sdk`              | Upgrade the `fa-mcp-sdk` dependency end-to-end (analyze, plan, apply).  |
+| `/change-log`               | Generate a Keep a Changelog entry between versions.                     |
+| `/feature-prompt-generator` | Turn a feature description into a self-sufficient prompt for an AI CLI. |
+| `/readme-generator`         | Generate structured `README.md` + satellite `readme-docs/*.md`.        |
+| `/mcp-app-create`           | Scaffold a new MCP App (interactive UI: tool + HTML resource).         |
+| `/mcp-app-add-to-server`    | Enrich existing MCP server tools with interactive UIs.                  |
+| `/create-mcp-wizard`        | End-to-end MCP server implementation from brief to live repo.          |
 
-Details, launch modes, and examples: [SKILLS](readme-docs/SKILLS.md)
+Details, launch modes, and examples: [SKILLS](./readme-docs/SKILLS.md).
 
-### Sharing Skills with OpenAI Codex
+The skills can also be shared with [OpenAI Codex](https://developers.openai.com/codex/) via
+`.agents/skills/`. Run `npm run agents:link` once to create the link
+(`npm run agents:link:status` / `npm run agents:link:remove` to inspect or undo it).
 
-The skills in `.claude/skills/` can also be used from [OpenAI Codex](https://developers.openai.com/codex/) —
-Codex officially reads project Skills from `.agents/skills/` and supports symlinked skill folders. Run the
-bundled helper once to create the link (junction on Windows, relative symlink on macOS/Linux):
+## Stack
 
-```bash
-npm run agents:link          # create .agents/skills -> .claude/skills
-npm run agents:link:status   # inspect current link state
-npm run agents:link:remove   # remove the link
-```
+- **Framework**: [fa-mcp-sdk](https://github.com/Bazilio-san/fa-mcp-sdk)
+- **Transport**: MCP (STDIO, HTTP, SSE)
+- **Language**: TypeScript (ESM, Node ≥ 20)
+- **MCP SDK**: `@modelcontextprotocol/sdk`
+- **Tooling**: oxlint, oxfmt, jest
 
-Only skills are linked. Other Claude Code entities (`.claude/agents/`, `.claude/commands/`, hooks, MCP config)
-use formats incompatible with Codex (TOML agents in `.codex/agents/`, MCP servers in `.codex/config.toml`) and
-must be configured separately. For project guidance, this template already keeps a single `AGENTS.md` and
-imports it from `CLAUDE.md` via `@AGENTS.md`, so the same instructions feed both tools.
+## License
 
-## Security
-
-### Admin panel JWT requirement
-
-When `adminPanel.authType` includes `jwtToken`, the admin panel (`/admin`) accepts a JWT
-**only if its payload contains `allow: 'gen-token'`**. JWTs without this claim are
-rejected with `401` — this blocks short-lived tokens issued for other purposes (for
-example, the 5-minute JWT auto-generated by the Agent Tester page and written into its
-`Authorization` header) from being replayed to mint arbitrary long-lived tokens.
-
-`permanentServerTokens` and `basic` admin auth are unaffected by this check.
-
-Generate an admin-capable JWT:
-
-```bash
-node scripts/generate-jwt.js -u admin -ttl 30d -p "allow=gen-token"
-```
-
-## Public Contract
-
-The runtime contract surfaced by this server (transports, HTTP endpoints, JWT claims, tool /
-prompt / resource shape, error mapping, headers, semver and deprecation policy) is documented
-in [FA-MCP-SDK-DOC/11-public-contract.md](FA-MCP-SDK-DOC/11-public-contract.md).
-
-Tools, prompts and resources exposed by this project are listed in the table below — update
-this section whenever you add, rename, or remove an entry.
-
-### Tools
-
-| Name | Description |
-|------|-------------|
-| `<tool_name>` | Short description |
-
-### Prompts
-
-| Name | Description |
-|------|-------------|
-| `agent_brief` | Short agent description (built-in) |
-| `agent_prompt` | Full system prompt (built-in) |
-
-### Resources
-
-| URI | Description |
-|-----|-------------|
-| `project://version` | SDK / project version (built-in) |
-| `use://auth` | Authentication self-description (built-in) |
-| `<service>://agent/brief` | Mirror of `agent_brief` (built-in) |
-| `<service>://agent/prompt` | Mirror of `agent_prompt` (built-in) |
-
-## Versioning policy
-
-This project follows the semver contract documented in
-[FA-MCP-SDK-DOC/11-public-contract.md](FA-MCP-SDK-DOC/11-public-contract.md#8-versioning-policy-171).
-Mark every `MAJOR` change with `[BREAKING]` in `CHANGELOG.md`.
-
+MIT © Viacheslav Makarov. See [LICENSE](./LICENSE).
