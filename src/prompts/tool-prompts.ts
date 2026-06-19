@@ -1,26 +1,17 @@
 import { TPromptContentFunction } from 'fa-mcp-sdk';
 
+import { toolModules } from '../tools/tools.js';
+
 /**
  * Tool-specific prompts served by the built-in `tool_prompt` prompt.
  *
- * The `tool_prompt` prompt is always advertised over MCP, but it returns a non-empty string only
- * for the tools listed here. Clients pass the tool name in the required `tool` argument; the home
- * page catalog viewer additionally shows a dropdown of the tools that have a non-empty prompt.
- *
- * Add an entry keyed by the MCP tool name to attach usage instructions to that tool.
+ * The source of truth for each prompt lives in its own tool module (one file per tool). This
+ * aggregator collects the non-empty ones and serves them by tool name, which is what the SDK's
+ * `tool_prompt` prompt expects (the tool name arrives in the required `tool` argument).
  */
-const TOOL_PROMPTS: Record<string, string> = {
-  search_products: `Инструмент search_products ищет товары ВкусВилл по тексту.
-
-- Запрос передавай в обязательное поле "query".
-- В ответе у каждого товара есть "id" (для get_product_details / get_product_analogs) и "xml_id" (для create_cart_link).
-- На странице 10 товаров; для следующих результатов увеличивай "page".`,
-
-  create_cart_link: `Инструмент create_cart_link собирает ссылку на корзину ВкусВилл.
-
-- Передай массив "items"; для каждого товара нужен "xml_id" (берётся из search_products) и "quantity".
-- Сначала найди товары через search_products, чтобы получить их xml_id — не угадывай идентификаторы.`,
-};
+const TOOL_PROMPTS: Record<string, string> = Object.fromEntries(
+  toolModules.filter((m) => m.prompt).map((m) => [m.definition.name, m.prompt as string]),
+);
 
 export const toolPrompt: TPromptContentFunction = (_request, args) => {
   const tool = args?.tool;

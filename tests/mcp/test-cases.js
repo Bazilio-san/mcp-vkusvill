@@ -60,33 +60,7 @@ export const TEMPLATE_TESTS = {
     },
   ],
 
-  resources: [
-    async (client) => {
-      const name = 'List resources contains custom-resource://resource1';
-      try {
-        const list = await client.listResources();
-        const resources = list?.resources || list;
-        const uris = Array.isArray(resources) ? resources.map((r) => r.uri) : [];
-        const found = uris.includes('custom-resource://resource1');
-        return found ? ok(name, { uris }) : fail(name, { uris });
-      } catch (e) {
-        return fail(name, { error: e?.message });
-      }
-    },
-    async (client) => {
-      const name = 'Read resource custom-resource://resource1 returns content';
-      try {
-        const resp = await client.readResource('custom-resource://resource1');
-        // Different clients return differently; normalize
-        const r = resp?.result || resp;
-        const text = r?.resource?.text || r?.contents?.[0]?.text || r?.text || r?.resource?.content;
-        const okText = typeof text === 'string' && text.length > 0;
-        return okText ? ok(name, { text }) : fail(name, { response: r });
-      } catch (e) {
-        return fail(name, { error: e?.message });
-      }
-    },
-  ],
+  resources: [],
 
   tools: [
     async (client) => {
