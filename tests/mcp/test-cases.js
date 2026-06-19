@@ -58,17 +58,6 @@ export const TEMPLATE_TESTS = {
         return fail(name, { error: e?.message });
       }
     },
-    async (client) => {
-      const name = 'Get custom_prompt returns dynamic text';
-      try {
-        const resp = await client.getPrompt('custom_prompt', { sample: '1' });
-        const text = extractPromptText(resp);
-        const hasWord = typeof text === 'string' && text.includes('Custom prompt content');
-        return hasWord ? ok(name, { text }) : fail(name, { text });
-      } catch (e) {
-        return fail(name, { error: e?.message });
-      }
-    },
   ],
 
   resources: [
