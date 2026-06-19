@@ -10,18 +10,16 @@ import { TPromptContentFunction } from 'fa-mcp-sdk';
  * Add an entry keyed by the MCP tool name to attach usage instructions to that tool.
  */
 const TOOL_PROMPTS: Record<string, string> = {
-  example_tool: `You are using the "example_tool" tool, which processes a text input and returns the result.
+  search_products: `Инструмент search_products ищет товары ВкусВилл по тексту.
 
-- Pass the text to process in the required "query" field.
-- Keep the input concise; send one logical request at a time.
-- Use the returned text as the processed output — do not re-process it again unless the user asks.`,
+- Запрос передавай в обязательное поле "query".
+- В ответе у каждого товара есть "id" (для get_product_details / get_product_analogs) и "xml_id" (для create_cart_link).
+- На странице 10 товаров; для следующих результатов увеличивай "page".`,
 
-  example_search: `You are using the "example_search" tool, which performs a search with pagination and filtering.
+  create_cart_link: `Инструмент create_cart_link собирает ссылку на корзину ВкусВилл.
 
-- Put the search text in the required "query" field.
-- Use "limit" (1-100, default 20) to cap the number of results; request only as many as you need.
-- Use "threshold" (0-1) to drop low-similarity matches when precision matters more than recall.
-- Read results from the "results" array; "total" reports how many matches exist overall.`,
+- Передай массив "items"; для каждого товара нужен "xml_id" (берётся из search_products) и "quantity".
+- Сначала найди товары через search_products, чтобы получить их xml_id — не угадывай идентификаторы.`,
 };
 
 export const toolPrompt: TPromptContentFunction = (_request, args) => {

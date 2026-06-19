@@ -1,136 +1,134 @@
 import chalk from 'chalk';
 
 import {
-  debugMcpTool,
-  formatToolResult,
+  asTextContent,
+  asTextError,
+  IToolHandlerParams,
   logger as lgr,
-  maskSensitive,
   ToolExecutionError,
   TToolHandlerResponse,
 } from 'fa-mcp-sdk';
 
+import {
+  formatAnalogsList,
+  formatCartLink,
+  formatProductDetails,
+  formatProductsList,
+  formatRecipesList,
+  formatShopsList,
+} from '../lib/format.js';
+import { getVkusvillClient, VkusvillApiError } from '../lib/vkusvill-client.js';
+
 const logger = lgr.getSubLogger({ name: chalk.bgGrey('tools') });
 
 /**
- * Template tool handler - customize this for your specific tools
- * This handles MCP tool execution requests
+ * Routes MCP tool calls to the VkusVill upstream and formats the result.
  *
- * Debug output for tool requests/responses is wired up centrally by the SDK
- * (see `init-mcp-server.ts`) and activated with `DEBUG=mcp:tool`. Other MCP
- * channels have their own switches: `DEBUG=mcp:resource`, `DEBUG=mcp:prompt`,
- * `DEBUG=mcp:notification`. Use `DEBUG=mcp:*` to enable them all at once.
+ * Tool-level upstream failures (invalid id, business errors) are returned as `asTextError` so the
+ * LLM sees them in-conversation and can react. Only genuinely unknown tools throw a protocol error.
  */
-export const handleToolCall = async (params: {
-  name: string;
-  arguments?: any;
-  signal?: AbortSignal;
-  sendProgress?: (progress: number, total?: number, message?: string) => void;
-}): Promise<any> => {
-  const { name, arguments: args, signal, sendProgress } = params;
-
+export const handleToolCall = async (params: IToolHandlerParams): Promise<TToolHandlerResponse> => {
+  const { name, arguments: args, signal } = params;
   logger.info(`Tool called: ${name}`);
 
-  try {
-    let result: TToolHandlerResponse;
-    // TODO: Implement your tool routing logic here
-    switch (name) {
-      case 'example_tool':
-        result = await handleExampleTool(args);
-        break;
+  const client = getVkusvillClient();
 
-      case 'example_long_task':
-        result = await handleExampleLongTask(args, { signal, sendProgress });
-        break;
+  try {
+    switch (name) {
+      case 'search_products': {
+        const data = await client.callTool(
+          'vkusvill_products_search',
+          {
+            q: String(args?.query ?? ''),
+            page: args?.page ?? 1,
+            sort: args?.sort ?? 'popularity',
+            vvonly: args?.vvonly ?? 1,
+          },
+          signal,
+        );
+        return asTextContent(formatProductsList(data, 'товаров'));
+      }
+
+      case 'get_product_details': {
+        const data = await client.callTool('vkusvill_product_details', { id: args?.product_id }, signal);
+        return asTextContent(formatProductDetails(data));
+      }
+
+      case 'get_product_analogs': {
+        const data = await client.callTool('vkusvill_product_analogs', { id: args?.product_id }, signal);
+        return asTextContent(formatAnalogsList(data));
+      }
+
+      case 'get_discounts': {
+        const data = await client.callTool(
+          'vkusvill_products_discount',
+          {
+            type: args?.discount_type ?? 'card',
+            page: args?.page ?? 1,
+            sort: args?.sort ?? 'popularity',
+            vvonly: args?.vvonly ?? 1,
+          },
+          signal,
+        );
+        return asTextContent(formatProductsList(data, 'акционных товаров'));
+      }
+
+      case 'find_shops': {
+        const data = await client.callTool(
+          'vkusvill_shops',
+          {
+            page: args?.page ?? 1,
+            id_region_filter: args?.region_id ?? 0,
+            id_city_filter: args?.city_id ?? 0,
+            id_subway_filter: args?.subway_id ?? 0,
+            id_feature_filter: args?.feature_id ?? 0,
+          },
+          signal,
+        );
+        return asTextContent(formatShopsList(data));
+      }
+
+      case 'search_recipes': {
+        // Upstream marks every recipe param as required, so inject defaults for anything omitted.
+        const data = await client.callTool(
+          'vkusvill_recipes',
+          {
+            q: String(args?.query ?? ''),
+            page: args?.page ?? 1,
+            sort: args?.sort ?? 'popularity',
+            id_feature_filter: args?.feature_id ?? 0,
+            id_cooking_time_filter: args?.cooking_time_id ?? 0,
+            id_cooking_method_filter: args?.cooking_method_id ?? 0,
+            id_complexity_filter: args?.complexity_id ?? 0,
+            id_category_filter: args?.category_id ?? 0,
+            id_exclude_allergens_filter: Array.isArray(args?.exclude_allergens) ? args.exclude_allergens : [],
+          },
+          signal,
+        );
+        return asTextContent(formatRecipesList(data));
+      }
+
+      case 'create_cart_link': {
+        const items = Array.isArray(args?.items) ? args.items : [];
+        const products = items.map((it: any) => ({
+          xml_id: Number(it?.xml_id),
+          q: it?.quantity != null ? Number(it.quantity) : 1,
+        }));
+        const data = await client.callTool('vkusvill_cart_link_create', { products }, signal);
+        return asTextContent(formatCartLink(data));
+      }
 
       default:
         throw new ToolExecutionError(name, `Unknown tool: ${name}`);
     }
-
-    // Optional: per-handler debug hook, in addition to the SDK-level wrapper.
-    // Useful if you want to inspect intermediate (pre-format) values inside a
-    // specific tool — define a new Debug category in `src/lib/debug.ts` and
-    // call it here. The example below piggybacks on the built-in switch.
-    if (debugMcpTool.enabled) {
-      debugMcpTool(`handler[${name}] returned\n${JSON.stringify(result, null, 2)}`);
-    }
-
-    return result;
   } catch (error: Error | any) {
+    // Business / upstream errors → surface to the LLM as a tool-level error, do not throw.
+    if (error instanceof VkusvillApiError) {
+      logger.warn(`Upstream error for ${name}: ${error.message}`);
+      return asTextError(`Сервис ВкусВилл не смог выполнить запрос: ${error.message}`);
+    }
     logger.error(`Tool execution failed for ${name}:`, error);
     error.printed = true;
     throw error;
   }
 };
-
-/**
- * Example tool implementation
- * Replace this with your actual tool logic
- */
-async function handleExampleTool(args: any): Promise<TToolHandlerResponse> {
-  const { query } = args || {};
-
-  if (!query) {
-    throw new ToolExecutionError('example_tool', 'Query parameter is required');
-  }
-
-  // Simulate some work
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  const result = {
-    message: `Processed query: ${query}`,
-    timestamp: new Date().toISOString(),
-  };
-
-  // Standard §12.2 — masking personal / sensitive data is the server's responsibility. For domains
-  // with such data, run the result through `maskSensitive` before returning. It is opt-in: the SDK
-  // never masks automatically. Rules are explicit (field names + regex), nothing is guessed.
-  // Example (no-op here, since the sample result has no sensitive fields):
-  const safeResult = maskSensitive(result, {
-    fieldNames: ['password', 'token', 'ssn'],
-    patterns: [/\b\d{13,19}\b/g], // card-like number sequences
-    replacement: '***',
-  });
-
-  return formatToolResult(safeResult);
-}
-
-/**
- * Example long-running tool (standard §8.7). Processes a number of steps with an artificial delay,
- * emitting `sendProgress` after each step and aborting early when the client cancels.
- *
- * The same handler runs whether the tool is called synchronously or as a task — the SDK supplies
- * `signal` and `sendProgress` in both cases. As a task, `signal` is flipped by `tasks/cancel` and
- * progress is delivered via `notifications/progress`; synchronously, the 30s tool timeout applies,
- * which is exactly why long work should be invoked as a task.
- */
-async function handleExampleLongTask(
-  args: any,
-  {
-    signal,
-    sendProgress,
-  }: {
-    signal?: AbortSignal | undefined;
-    sendProgress?: ((p: number, total?: number, m?: string) => void) | undefined;
-  },
-): Promise<TToolHandlerResponse> {
-  const steps = Math.min(20, Math.max(1, Number(args?.steps) || 5));
-
-  for (let i = 1; i <= steps; i++) {
-    if (signal?.aborted) {
-      throw new ToolExecutionError('example_long_task', 'Cancelled by client');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    sendProgress?.(i, steps, `Completed step ${i} of ${steps}`);
-  }
-
-  return formatToolResult({
-    message: `Completed ${steps} steps`,
-    steps,
-    finishedAt: new Date().toISOString(),
-  });
-}
-
-// TODO: Add more tool handlers here
-// async function handleAnotherTool(args: any): Promise<string> {
-//   // Your implementation
-// }

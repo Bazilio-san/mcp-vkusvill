@@ -1,137 +1,270 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
-import { IToolInputSchema, IToolProperties } from 'fa-mcp-sdk';
+import { IToolInputSchema } from 'fa-mcp-sdk';
 
 /**
- * Template tools configuration for MCP Server
- * Define your tools according to your server's functionality
+ * VkusVill MCP proxy tools.
  *
- * Schemas follow JSON Schema draft 2020-12 (`$schema`) and reject unknown fields
- * (`additionalProperties: false`) — required by standard §9.2.
+ * Each tool wraps a tool of the official VkusVill MCP API (https://mcp001.vkusvill.ru/mcp) and
+ * reformats its raw JSON into readable Markdown (see src/lib/format.ts). Schemas follow JSON Schema
+ * draft 2020-12 and reject unknown fields (`additionalProperties: false`).
+ *
+ * Mapping (our tool → upstream tool):
+ *   search_products      → vkusvill_products_search
+ *   get_product_details  → vkusvill_product_details
+ *   get_product_analogs  → vkusvill_product_analogs
+ *   get_discounts        → vkusvill_products_discount
+ *   find_shops           → vkusvill_shops
+ *   search_recipes       → vkusvill_recipes
+ *   create_cart_link     → vkusvill_cart_link_create
  */
 
 const JSON_SCHEMA_2020_12 = 'https://json-schema.org/draft/2020-12/schema';
 
-const getGenericInputSchema = (
-  queryDescription?: string,
-  additionalProperties?: IToolProperties,
-): IToolInputSchema => ({
-  $schema: JSON_SCHEMA_2020_12,
-  type: 'object',
-  properties: {
-    query: {
-      type: 'string',
-      description: queryDescription || 'Input query or text',
-    },
-    ...additionalProperties,
-  },
-  required: ['query'],
-  additionalProperties: false,
-});
+const PRODUCT_SORT = ['popularity', 'rating', 'price_asc', 'price_desc', 'new'] as const;
 
-const getSearchInputSchema = (): IToolInputSchema => ({
+const searchProductsSchema: IToolInputSchema = {
   $schema: JSON_SCHEMA_2020_12,
   type: 'object',
   properties: {
-    query: {
-      type: 'string',
-      description: 'Search query',
-    },
-    limit: {
-      type: 'number',
-      description: 'Maximum number of results to return (1-100, default: 20)',
+    query: { type: 'string', description: 'Поисковый запрос, например «молоко 3.2» или «хлеб бездрожжевой»' },
+    page: {
+      type: 'integer',
+      description: 'Номер страницы результатов (по 10 товаров на странице, по умолчанию 1)',
       minimum: 1,
-      maximum: 100,
+      maximum: 99999,
     },
-    threshold: {
-      type: 'number',
-      description: 'Minimum similarity threshold (0-1)',
-      minimum: 0,
-      maximum: 1,
+    sort: {
+      type: 'string',
+      description:
+        'Сортировка: popularity — по популярности (по умолчанию), rating — по рейтингу, ' +
+        'price_asc — дешевле сначала, price_desc — дороже сначала, new — новинки',
+      enum: [...PRODUCT_SORT],
+    },
+    vvonly: {
+      type: 'integer',
+      description: 'Искать только товары бренда ВкусВилл: 1 — да (по умолчанию), 0 — все товары',
+      enum: [0, 1],
     },
   },
   required: ['query'],
   additionalProperties: false,
-});
+};
 
-const exampleSearchOutputSchema = {
+const productIdSchema: IToolInputSchema = {
   $schema: JSON_SCHEMA_2020_12,
   type: 'object',
   properties: {
-    results: {
+    product_id: {
+      type: 'integer',
+      description: 'Числовой ID товара ВкусВилл (поле id из результатов search_products)',
+      minimum: 1,
+      maximum: 999999999,
+    },
+  },
+  required: ['product_id'],
+  additionalProperties: false,
+};
+
+const discountsSchema: IToolInputSchema = {
+  $schema: JSON_SCHEMA_2020_12,
+  type: 'object',
+  properties: {
+    discount_type: {
+      type: 'string',
+      description: 'Тип скидки: card — по карте лояльности (по умолчанию), quantity — при покупке нескольких товаров',
+      enum: ['card', 'quantity'],
+    },
+    page: {
+      type: 'integer',
+      description: 'Номер страницы (по 10 товаров на странице, по умолчанию 1)',
+      minimum: 1,
+      maximum: 99999,
+    },
+    sort: {
+      type: 'string',
+      description: 'Сортировка: popularity (по умолчанию), rating, price_asc, price_desc, new, name_asc, name_desc',
+      enum: ['popularity', 'rating', 'price_asc', 'price_desc', 'new', 'name_asc', 'name_desc'],
+    },
+    vvonly: {
+      type: 'integer',
+      description: 'Только товары бренда ВкусВилл: 1 — да (по умолчанию), 0 — все',
+      enum: [0, 1],
+    },
+  },
+  required: [],
+  additionalProperties: false,
+};
+
+const shopsSchema: IToolInputSchema = {
+  $schema: JSON_SCHEMA_2020_12,
+  type: 'object',
+  properties: {
+    page: {
+      type: 'integer',
+      description: 'Номер страницы (по 10 магазинов на странице, по умолчанию 1)',
+      minimum: 1,
+      maximum: 99999,
+    },
+    region_id: {
+      type: 'integer',
+      description: 'ID региона для фильтра (список id возвращается в блоке фильтров при page=1)',
+      minimum: 0,
+      maximum: 999999999,
+    },
+    city_id: {
+      type: 'integer',
+      description: 'ID города для фильтра',
+      minimum: 0,
+      maximum: 999999999,
+    },
+    subway_id: {
+      type: 'integer',
+      description: 'ID станции метро для фильтра',
+      minimum: 0,
+      maximum: 999999999,
+    },
+    feature_id: {
+      type: 'integer',
+      description: 'ID особенности магазина (например, кафе, мясная витрина)',
+      minimum: 0,
+      maximum: 999999999,
+    },
+  },
+  required: [],
+  additionalProperties: false,
+};
+
+const recipesSchema: IToolInputSchema = {
+  $schema: JSON_SCHEMA_2020_12,
+  type: 'object',
+  properties: {
+    query: {
+      type: 'string',
+      description: 'Поисковый запрос по рецептам, например «блины» (необязательно)',
+      maxLength: 255,
+    },
+    page: {
+      type: 'integer',
+      description: 'Номер страницы (по 10 рецептов на странице, по умолчанию 1)',
+      minimum: 1,
+      maximum: 99999,
+    },
+    sort: {
+      type: 'string',
+      description: 'Сортировка: popularity — по популярности (по умолчанию), new — новинки',
+      enum: ['popularity', 'new'],
+    },
+    feature_id: {
+      type: 'integer',
+      description: 'ID особенности рецепта (см. блок фильтров при page=1)',
+      minimum: 0,
+      maximum: 999999999,
+    },
+    cooking_time_id: { type: 'integer', description: 'ID времени готовки', minimum: 0, maximum: 999999999 },
+    cooking_method_id: { type: 'integer', description: 'ID способа приготовления', minimum: 0, maximum: 999999999 },
+    complexity_id: { type: 'integer', description: 'ID сложности', minimum: 0, maximum: 999999999 },
+    category_id: { type: 'integer', description: 'ID категории', minimum: 0, maximum: 999999999 },
+    exclude_allergens: {
       type: 'array',
+      description: 'Массив ID аллергенов, которые нужно исключить (см. блок фильтров при page=1)',
+      items: { type: 'integer', minimum: 1, maximum: 999999999 },
+    },
+  },
+  required: [],
+  additionalProperties: false,
+};
+
+const cartLinkSchema: IToolInputSchema = {
+  $schema: JSON_SCHEMA_2020_12,
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      description: 'Товары для корзины (от 1 до 30 позиций)',
+      minItems: 1,
+      maxItems: 30,
       items: {
         type: 'object',
         properties: {
-          id: { type: 'string' },
-          score: { type: 'number' },
-          text: { type: 'string' },
+          xml_id: {
+            type: 'integer',
+            description: 'XML ID товара (поле xml_id из результатов поиска)',
+            minimum: 1,
+            maximum: 999999999,
+          },
+          quantity: {
+            type: 'number',
+            description: 'Количество (от 0.01 до 40, по умолчанию 1)',
+            minimum: 0.01,
+            maximum: 40,
+          },
         },
-        required: ['id'],
-        additionalProperties: true,
+        required: ['xml_id'],
+        additionalProperties: false,
       },
     },
-    total: { type: 'number' },
   },
-  required: ['results'],
-  additionalProperties: true,
-} as const;
+  required: ['items'],
+  additionalProperties: false,
+};
 
-// Template tools - customize according to your needs
 export const tools: Tool[] = [
   {
-    name: 'example_tool',
-    title: 'Example: process text',
-    description: 'Example tool that processes text input. Replace with your actual tools.',
-    inputSchema: getGenericInputSchema('Text to process'),
+    name: 'search_products',
+    title: 'Поиск товаров ВкусВилл',
+    description:
+      'Поиск товаров ВкусВилл по текстовому запросу. Возвращает список товаров с ценой, рейтингом, весом, ' +
+      'ссылкой и идентификаторами (id, xml_id). По 10 товаров на странице — для следующих результатов увеличивайте page.',
+    inputSchema: searchProductsSchema,
   },
   {
-    name: 'example_search',
-    title: 'Example: search with filters',
-    description: 'Example search tool with pagination and filtering. Template for search-based tools.',
-    inputSchema: getSearchInputSchema(),
-    outputSchema: exampleSearchOutputSchema as any,
+    name: 'get_product_details',
+    title: 'Детали товара',
+    description:
+      'Детальная информация о товаре ВкусВилл по его id (берётся из search_products): состав, КБЖУ (пищевая ценность), ' +
+      'аллергены, срок годности, условия хранения, производитель, цена и рейтинг.',
+    inputSchema: productIdSchema,
   },
   {
-    // Standard §8.7 / §9.1 — example of a long-running tool that opts in to task-augmented
-    // execution. With `mcp.tasks.enabled: true`, a client MAY send a `task` param to tools/call:
-    // the server returns a taskId immediately, runs this handler in the background (reporting
-    // progress and honouring cancellation), and the client polls tasks/get + tasks/result.
-    // `taskSupport: 'optional'` keeps the tool callable synchronously too — choose a task when the
-    // work can exceed the 30s tool timeout or you want a cancellable, pollable operation.
-    name: 'example_long_task',
-    title: 'Example: long-running task',
-    description: `Example long-running tool that emits progress and supports cancellation. 
-Demonstrates task-augmented execution — call it with a 'task' param to run it as a task.`,
-    inputSchema: {
-      $schema: JSON_SCHEMA_2020_12,
-      type: 'object',
-      properties: {
-        steps: {
-          type: 'number',
-          description: 'Number of processing steps to simulate (1-20, default 5)',
-          minimum: 1,
-          maximum: 20,
-        },
-      },
-      required: [],
-      additionalProperties: false,
-    },
-    execution: { taskSupport: 'optional' },
-  } as Tool,
-  // TODO: Add your actual tools here
-  // {
-  //   name: 'your_tool_name',
-  //   title: 'Human-readable title shown in UI',
-  //   description: 'Description of what your tool does',
-  //   inputSchema: getGenericInputSchema('Your query description', {
-  //     // additional parameters
-  //     param1: {
-  //       type: 'string',
-  //       description: 'Description of param1',
-  //     },
-  //   }),
-  // },
+    name: 'get_product_analogs',
+    title: 'Аналоги товара',
+    description:
+      'Похожие товары (аналоги) для товара ВкусВилл по его id из search_products. Удобно для замены или сравнения.',
+    inputSchema: productIdSchema,
+  },
+  {
+    name: 'get_discounts',
+    title: 'Акционные товары',
+    description:
+      'Список акционных товаров ВкусВилл со скидками. Тип скидки: card — по карте лояльности, quantity — при покупке нескольких ' +
+      'товаров. Показывает старую и новую цену, размер и условия скидки.',
+    inputSchema: discountsSchema,
+  },
+  {
+    name: 'find_shops',
+    title: 'Поиск магазинов',
+    description:
+      'Поиск магазинов ВкусВилл: адрес, координаты, телефон, режим работы, особенности. Чтобы узнать доступные id регионов, ' +
+      'городов и метро для фильтров, вызовите без фильтров (page=1) — справочник придёт в блоке фильтров.',
+    inputSchema: shopsSchema,
+  },
+  {
+    name: 'search_recipes',
+    title: 'Поиск рецептов',
+    description:
+      'Поиск рецептов ВкусВилл по запросу и фильтрам. Возвращает ингредиенты, КБЖУ на 100 г, пошаговое приготовление, аллергены. ' +
+      'Чтобы узнать id фильтров (время готовки, способ, сложность, аллергены), вызовите с page=1 — справочник придёт в блоке фильтров.',
+    inputSchema: recipesSchema,
+  },
+  {
+    name: 'create_cart_link',
+    title: 'Создать ссылку на корзину',
+    description:
+      'Создаёт ссылку на корзину ВкусВилл с выбранными товарами. На вход — массив items с xml_id товара (из search_products) ' +
+      'и количеством. Возвращает ссылку, по которой товары добавляются в корзину одним переходом.',
+    inputSchema: cartLinkSchema,
+  },
 ];
 
 // Helper to get tool by name

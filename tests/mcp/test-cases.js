@@ -101,40 +101,63 @@ export const TEMPLATE_TESTS = {
 
   tools: [
     async (client) => {
-      const name = 'List tools contains example_tool and example_search';
+      const name = 'List tools contains the 7 VkusVill tools';
       try {
         const list = await client.listTools();
         const tools = list?.tools || list;
         const names = Array.isArray(tools) ? tools.map((t) => t.name) : [];
-        const ok1 = names.includes('example_tool');
-        const ok2 = names.includes('example_search');
-        return ok1 && ok2 ? ok(name, { names }) : fail(name, { names });
+        const expected = [
+          'search_products',
+          'get_product_details',
+          'get_product_analogs',
+          'get_discounts',
+          'find_shops',
+          'search_recipes',
+          'create_cart_link',
+        ];
+        const missing = expected.filter((n) => !names.includes(n));
+        return missing.length === 0 ? ok(name, { names }) : fail(name, { missing, names });
       } catch (e) {
         return fail(name, { error: e?.message });
       }
     },
     async (client) => {
-      const name = 'Call example_tool returns formatted result';
+      const name = 'Call search_products returns formatted products (live API)';
       try {
-        const resp = await client.callTool('example_tool', { query: 'ping' });
+        const resp = await client.callTool('search_products', { query: 'молоко 3.2' });
         const r = resp?.result || resp;
-        // Both structuredContent and text are acceptable; check message echo
-        const structured = r?.structuredContent;
-        const text = r?.content?.[0]?.text;
-        const hasProcessed =
-          (structured && structured.message?.includes('Processed query')) ||
-          (typeof text === 'string' && text.includes('Processed query'));
-        return hasProcessed ? ok(name, { response: r }) : fail(name, { response: r });
+        const text = r?.content?.[0]?.text || r?.structuredContent?.text || JSON.stringify(r?.structuredContent || '');
+        // Formatter prints "Цена: <n> ₽" for found products.
+        const looksFormatted = typeof text === 'string' && (text.includes('₽') || text.includes('найдено'));
+        return looksFormatted ? ok(name, { sample: String(text).slice(0, 200) }) : fail(name, { response: r });
       } catch (e) {
         return fail(name, { error: e?.message });
       }
     },
     async (client) => {
-      const name = 'Call example_tool without query should fail';
+      const name = 'Call get_product_details for id 173 returns composition/nutrition (live API)';
       try {
-        await client.callTool('example_tool', {});
-        return fail(name, { error: 'Expected failure, got success' });
+        const resp = await client.callTool('get_product_details', { product_id: 173 });
+        const r = resp?.result || resp;
+        const text = r?.content?.[0]?.text || '';
+        const hasInfo =
+          typeof text === 'string' && (text.includes('Состав') || text.includes('ценность') || text.includes('₽'));
+        return hasInfo ? ok(name, { sample: String(text).slice(0, 200) }) : fail(name, { response: r });
       } catch (e) {
+        return fail(name, { error: e?.message });
+      }
+    },
+    async (client) => {
+      const name = 'Call get_product_details with absurd id yields a tool-level error';
+      try {
+        const resp = await client.callTool('get_product_details', { product_id: 999999999 });
+        const r = resp?.result || resp;
+        const isError = r?.isError === true;
+        const text = r?.content?.[0]?.text || '';
+        const looksError = isError || (typeof text === 'string' && /ошиб|не смог|не найден/i.test(text));
+        return looksError ? ok(name, { sample: String(text).slice(0, 160) }) : fail(name, { response: r });
+      } catch (e) {
+        // A thrown JSON-RPC error is also an acceptable signal of rejection.
         return ok(name, { error: e?.message });
       }
     },
