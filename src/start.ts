@@ -5,8 +5,7 @@ import { apiRouter } from './api/router.js';
 import { AGENT_BRIEF } from './prompts/agent-brief.js';
 import { AGENT_PROMPT } from './prompts/agent-prompt.js';
 import { toolPrompt } from './prompts/tool-prompts.js';
-import { handleToolCall } from './tools/handle-tool-call.js';
-import { tools } from './tools/tools.js';
+import { handleToolCall, tools } from './tools/tools.js';
 
 const isConsulProd = (process.env.NODE_CONSUL_ENV || process.env.NODE_ENV) === 'production';
 
