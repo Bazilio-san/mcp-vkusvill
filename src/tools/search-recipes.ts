@@ -9,6 +9,113 @@ import { IToolModule } from '../_types_/common';
 
 /** search_recipes → upstream vkusvill_recipes. */
 
+// Filter reference taken from the upstream `meta.filters` block (search-recipes.json). Each enum value maps to the
+// numeric filter id the upstream expects; the handler resolves the id by the unambiguous English name below.
+
+/** Способ приготовления — cooking method. */
+const COOKING_METHOD: Record<string, number> = {
+  slow_cooker: 305757, // В мультиварке
+  pan: 305758, // На сковороде
+  oven_or_grill: 305759, // В духовке или на гриле
+  steamed_or_boiled: 305760, // На пару или отварное
+  no_heat: 305762, // Без термообработки
+};
+
+/** Время готовки — cooking time. */
+const COOKING_TIME: Record<string, number> = {
+  up_to_20_min: 397967, // до 20 минут
+  up_to_40_min: 305736, // до 40 минут
+  up_to_1_hour: 305738, // до 1 часа
+  between_1_and_2_hours: 305739, // 1-2 часа
+  over_2_hours: 305740, // более 2 часов
+};
+
+/** Сложность — complexity. */
+const COMPLEXITY: Record<string, number> = {
+  easy: 393, // Легкий
+  medium: 394, // Средний
+  pro: 395, // Профи
+};
+
+/** Особенности — recipe feature. */
+const FEATURE: Record<string, number> = {
+  video: 305745, // Видеорецепты
+  from_social: 2405562, // Из соцсетей
+  seasonal: 5770634, // Сезонное
+  chef: 5770635, // Рецепт от шефа
+};
+
+/** Исключить аллергены — allergens to exclude. */
+const ALLERGEN: Record<string, number> = {
+  nuts: 305746, // Орехи
+  gluten: 305747, // Глютен
+  lactose: 305748, // Лактоза
+  onion: 305749, // Лук
+  eggs: 305751, // Яйца
+  sugar: 305752, // Сахар
+  sesame: 305754, // Кунжут
+  mustard: 305756, // Горчица
+};
+
+/** Категория — recipe category (all groups flattened into a single enum). */
+const CATEGORY: Record<string, number> = {
+  // Тематические рецепты
+  holiday: 345, // На праздник
+  new_year: 346, // Новый год
+  easter: 348, // Пасха
+  bbq: 648, // Шашлык
+  birthday: 1291, // День рождения
+  maslenitsa: 1292, // Масленица
+  // По типу блюда
+  soup: 330, // Суп
+  sauces: 331, // Соусы
+  main_course: 332, // Горячее
+  snacks: 335, // Закуски
+  baking: 336, // Выпечка
+  salads: 338, // Салаты
+  desserts: 340, // Десерты
+  pancakes: 349, // Блины
+  drinks: 350, // Напитки
+  casseroles: 2318, // Запеканки
+  // Особое питание
+  vegetarian: 344, // Вегетарианцам
+  vegan: 353, // Веганам
+  for_kids: 649, // Детям
+  high_protein: 2368, // Много белка
+  low_calorie: 2370, // Низкокалорийное
+  sugar_free: 2372, // Без сахара
+  allergen_free: 2374, // Без аллергенов
+  lenten: 2392, // Постное
+  // По ингредиенту
+  meat: 333, // Мясо
+  pasta: 341, // Паста и лапша
+  seafood: 342, // Морепродукты
+  vegetables: 343, // Овощи
+  fish: 644, // Рыба
+  poultry: 1263, // Птица
+  grains: 1283, // Крупы
+  cottage_cheese: 1290, // Творог
+  fruits_berries: 2350, // Фрукты и ягоды
+  mushrooms: 2362, // Грибы
+  eggs: 2398, // Яйца
+  cheese: 2400, // Сыр
+  legumes: 2402, // Бобовые
+  // Способ приготовления (category group, separate from the cooking_method filter)
+  cat_no_heat: 2279, // Без термообработки
+  oven: 2281, // В духовке
+  grill: 2283, // На гриле и в аэрогриле
+  cat_slow_cooker: 2285, // В мультиварке
+  cat_steamed_or_boiled: 2287, // На пару или отварное
+  cat_pan: 2289, // На сковороде
+  // На каждый день
+  simple: 334, // Простые рецепты
+  breakfast: 339, // На завтрак
+  lunch: 2273, // На обед
+  dinner: 2277, // На ужин
+  // От читателей
+  user_recipes: 1763, // Рецепты пользователей
+};
+
 const inputSchema: IToolInputSchema = {
   type: 'object',
   properties: {
@@ -28,20 +135,35 @@ const inputSchema: IToolInputSchema = {
       description: 'Sorting: popularity — by popularity (default), new — newest',
       enum: ['popularity', 'new'],
     },
-    feature_id: {
-      type: 'integer',
-      description: 'Recipe feature ID (see the filters block at page=1)',
-      minimum: 0,
-      maximum: 999999999,
+    feature: {
+      type: 'string',
+      description: 'Recipe feature: video, from_social, seasonal, chef',
+      enum: Object.keys(FEATURE),
     },
-    cooking_time_id: { type: 'integer', description: 'Cooking time ID', minimum: 0, maximum: 999999999 },
-    cooking_method_id: { type: 'integer', description: 'Cooking method ID', minimum: 0, maximum: 999999999 },
-    complexity_id: { type: 'integer', description: 'Complexity ID', minimum: 0, maximum: 999999999 },
-    category_id: { type: 'integer', description: 'Category ID', minimum: 0, maximum: 999999999 },
+    cooking_time: {
+      type: 'string',
+      description: 'Cooking time bucket',
+      enum: Object.keys(COOKING_TIME),
+    },
+    cooking_method: {
+      type: 'string',
+      description: 'Cooking method',
+      enum: Object.keys(COOKING_METHOD),
+    },
+    complexity: {
+      type: 'string',
+      description: 'Complexity: easy, medium, pro',
+      enum: Object.keys(COMPLEXITY),
+    },
+    category: {
+      type: 'string',
+      description: 'Recipe category (dish type, ingredient, special diet, cooking method group, occasion)',
+      enum: Object.keys(CATEGORY),
+    },
     exclude_allergens: {
       type: 'array',
-      description: 'Array of allergen IDs to exclude (see the filters block at page=1)',
-      items: { type: 'integer', minimum: 1, maximum: 999999999 },
+      description: 'Allergens to exclude from results',
+      items: { type: 'string', enum: Object.keys(ALLERGEN) },
     },
   },
   required: [],
@@ -139,6 +261,11 @@ const formatRecipesList = (data: { meta?: any; items?: IRecipe[] } | undefined):
 export const searchRecipesModule: IToolModule = {
   definition,
   handler: async (args, signal) => {
+    // Resolve each enum name to the numeric filter id the upstream expects; 0 means "no filter".
+    const idOf = (map: Record<string, number>, name: unknown): number => (typeof name === 'string' && map[name]) || 0;
+    const allergenIds = Array.isArray(args?.exclude_allergens)
+      ? args.exclude_allergens.map((name: unknown) => ALLERGEN[name as string]).filter(Boolean)
+      : [];
     // Upstream marks every recipe param as required, so inject defaults for anything omitted.
     const data = await getVkusvillClient().callTool(
       'vkusvill_recipes',
@@ -146,12 +273,12 @@ export const searchRecipesModule: IToolModule = {
         q: String(args?.query ?? ''),
         page: args?.page ?? 1,
         sort: args?.sort ?? 'popularity',
-        id_feature_filter: args?.feature_id ?? 0,
-        id_cooking_time_filter: args?.cooking_time_id ?? 0,
-        id_cooking_method_filter: args?.cooking_method_id ?? 0,
-        id_complexity_filter: args?.complexity_id ?? 0,
-        id_category_filter: args?.category_id ?? 0,
-        id_exclude_allergens_filter: Array.isArray(args?.exclude_allergens) ? args.exclude_allergens : [],
+        id_feature_filter: idOf(FEATURE, args?.feature),
+        id_cooking_time_filter: idOf(COOKING_TIME, args?.cooking_time),
+        id_cooking_method_filter: idOf(COOKING_METHOD, args?.cooking_method),
+        id_complexity_filter: idOf(COMPLEXITY, args?.complexity),
+        id_category_filter: idOf(CATEGORY, args?.category),
+        id_exclude_allergens_filter: allergenIds,
       },
       signal,
     );
