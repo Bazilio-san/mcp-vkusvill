@@ -4,4 +4,4 @@ webServer:
   # Список разрешённых источников (заголовок Origin) для CORS-стража MCP-сервера.
   # Браузер на публичном домене присылает Origin с этим адресом; без него в списке
   # запросы из Agent Tester и любых браузерных клиентов отклоняются с кодом 403.
-  originHosts: [ 'localhost', '0.0.0.0', 'mcp-vkusvill.time-gold.com' ]
+  originHosts: [ 'localhost', '0.0.0.0' ]
