@@ -63,16 +63,16 @@ const formatPrice = (price: Price): string | null => {
 interface IProduct {
   id?: number;
   xml_id?: number;
-  name?: string;
-  description?: string;
-  brand?: string;
+  name?: string | null;
+  description?: string | null;
+  brand?: string | null;
   price?: Price;
-  unit?: string;
-  weight?: { value?: number; unit?: string } | null;
-  rating?: { average?: number; count?: number } | null;
-  url?: string;
-  category?: Array<{ name?: string }>;
-  properties?: Array<{ name?: string; value?: string | null }>;
+  unit?: string | null;
+  weight?: { value?: number | null; unit?: string | null } | null;
+  rating?: { average?: number | null; count?: number | null } | null;
+  url?: string | null;
+  category?: Array<{ name?: string | null }>;
+  properties?: Array<{ name?: string | null; value?: unknown }>;
 }
 
 /** Compact one-product block used in search / analogs / discount lists. */

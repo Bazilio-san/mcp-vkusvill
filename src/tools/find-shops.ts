@@ -84,20 +84,55 @@ feature_id,feature_ru
   inputSchema,
 };
 
+interface IShopSubwayStation {
+  id?: number;
+  name?: string;
+  line?: string;
+}
+
 interface IShop {
   id?: number;
   url?: string;
-  region?: { name?: string };
-  city?: { name?: string };
+  region?: { id?: number; name?: string };
+  city?: { id?: number; name?: string };
   address?: string;
-  subway?: string | null;
+  /** `null` when no nearby station; array of station objects otherwise. */
+  subway?: IShopSubwayStation[] | null;
   phone?: string[];
   lat?: number;
   lon?: number;
   rating?: number;
   schedule?: string;
   schedule_holidays?: string | null;
-  features?: Array<{ name?: string }>;
+  description?: string | null;
+  features?: Array<{ id?: number; name?: string }>;
+}
+
+/** A single named filter (region / city / subway / feature) returned inside `meta.filters`. */
+export interface IShopsFilter {
+  name?: string;
+  param?: string;
+  items?: Array<{ id?: number; name?: string; line?: string }>;
+}
+
+/** Pagination + filter-reference block returned as `data.meta` by the upstream `vkusvill_shops` tool. */
+export interface IShopsMeta {
+  limit?: number;
+  total?: number;
+  page?: number;
+  pages?: number;
+  has_more?: boolean;
+  filters?: IShopsFilter[];
+  filters_applied?: unknown[];
+}
+
+/**
+ * Shape of the `data` field unwrapped from the upstream `vkusvill_shops` envelope.
+ * Top-level fields: `meta` (pagination + filter reference) and `items` (shop list).
+ */
+export interface IShopsData {
+  meta?: IShopsMeta;
+  items?: IShop[];
 }
 
 const formatShop = (s: IShop, index?: number): string => {
@@ -126,7 +161,7 @@ const formatShop = (s: IShop, index?: number): string => {
     }
   }
   if (s.lat != null && s.lon != null) {
-    lines.push(`Coordinates: ${num(s.lat)}, ${num(s.lon)}`);
+    lines.push(`Coordinates: ${s.lat}, ${s.lon}`);
   }
   if (s.url) {
     lines.push(s.url);
@@ -134,7 +169,7 @@ const formatShop = (s: IShop, index?: number): string => {
   return lines.join('\n');
 };
 
-const formatShopsList = (data: { meta?: any; items?: IShop[] } | undefined): string => {
+const formatShopsList = (data: IShopsData | undefined): string => {
   const items = data?.items || [];
   if (!items.length) {
     return 'No shops found.';
@@ -187,7 +222,7 @@ export const findShopsModule: IToolModule = {
       return asTextContent(problems.join('\n\n'));
     }
 
-    const data = await getVkusvillClient().callTool(
+    const data = await getVkusvillClient().callTool<IShopsData>(
       'vkusvill_shops',
       {
         page: args?.page ?? 1,
@@ -198,6 +233,7 @@ export const findShopsModule: IToolModule = {
       },
       signal,
     );
-    return asTextContent(formatShopsList(data));
+    const text = formatShopsList(data);
+    return asTextContent(text);
   },
 };

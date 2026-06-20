@@ -9,6 +9,80 @@ import { IToolModule } from '../_types_/common';
 
 /** search_products → upstream vkusvill_products_search. */
 
+/** Pagination metadata returned alongside the product list. */
+export interface ISearchProductsMeta {
+  /** Original search query string echoed back by the upstream. */
+  q: string;
+  limit: number;
+  total: number;
+  page: number;
+  pages: number;
+  has_more: boolean;
+}
+
+export interface IProductImage {
+  small?: string;
+  medium?: string;
+  large?: string;
+}
+
+export interface IProductCategory {
+  id?: number;
+  name?: string;
+  slug?: string;
+  url?: string;
+}
+
+/** Named attribute / nutritional fact attached to a product. */
+export interface IProductProperty {
+  name?: string;
+  value?: string | number | null;
+}
+
+export interface IProductPrice {
+  current?: number | null;
+  currency?: string | null;
+  old?: number | null;
+  /** Percentage discount when a loyalty-card promo is active. */
+  discount_percent?: number | null;
+  /** Human-readable promo description, e.g. "Скидка по карте лояльности по 21.06". */
+  discount_info?: string | null;
+}
+
+export interface IProductWeight {
+  value?: number | null;
+  unit?: string | null;
+}
+
+export interface IProductRating {
+  average?: number | null;
+  count?: number | null;
+}
+
+export interface IProduct {
+  id?: number;
+  /** Stable identifier used for cart link creation (xml_id field in create_cart_link). */
+  xml_id?: number;
+  name?: string;
+  slug?: string;
+  description?: string | null;
+  price?: IProductPrice;
+  /** Unit of sale, e.g. "шт". */
+  unit?: string | null;
+  weight?: IProductWeight;
+  rating?: IProductRating;
+  url?: string;
+  images?: IProductImage[];
+  category?: IProductCategory[];
+  properties?: IProductProperty[];
+}
+
+/** Unwrapped `data` payload returned by the upstream `vkusvill_products_search` tool. */
+export interface ISearchProductsData {
+  meta?: ISearchProductsMeta;
+  items?: IProduct[];
+}
+
 const inputSchema: IToolInputSchema = {
   type: 'object',
   properties: {
@@ -53,7 +127,7 @@ export const searchProductsModule: IToolModule = {
   definition,
   prompt,
   handler: async (args, signal) => {
-    const data = await getVkusvillClient().callTool(
+    const data = await getVkusvillClient().callTool<ISearchProductsData>(
       'vkusvill_products_search',
       {
         q: String(args?.query ?? ''),

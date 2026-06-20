@@ -8,6 +8,12 @@ import { IToolModule } from '../_types_/common';
 
 /** create_cart_link → upstream vkusvill_cart_link_create. */
 
+/** Shape of the `data` field returned by the upstream `vkusvill_cart_link_create` tool. */
+export interface ICartLinkData {
+  /** Shareable URL that pre-fills the VkusVill cart with the requested products. */
+  link?: string;
+}
+
 const inputSchema: IToolInputSchema = {
   type: 'object',
   properties: {
@@ -72,7 +78,7 @@ export const createCartLinkModule: IToolModule = {
       xml_id: Number(it?.xml_id),
       q: it?.quantity != null ? Number(it.quantity) : 1,
     }));
-    const data = await getVkusvillClient().callTool('vkusvill_cart_link_create', { products }, signal);
+    const data = await getVkusvillClient().callTool<ICartLinkData>('vkusvill_cart_link_create', { products }, signal);
     return asTextContent(formatCartLink(data));
   },
 };

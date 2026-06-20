@@ -182,16 +182,57 @@ To find the filter ids (cooking time, method, complexity, allergens), call with 
 interface IRecipe {
   id?: number;
   name?: string;
+  slug?: string;
   description?: string;
-  complexity?: { name?: string } | null;
+  show_counter?: number | null;
+  complexity?: { id?: number; name?: string } | null;
   portions?: number | null;
-  cooking_time?: { name?: string } | null;
+  cooking_time?: { id?: number; name?: string } | null;
+  cooking_method?: { id?: number; name?: string } | null;
   url?: string;
-  image?: string;
-  ingredients?: Array<{ name?: string; quantity?: string | null }> | null;
-  steps?: Array<{ step_number?: number; text?: string }> | null;
+  image?: string | null;
+  rating?: number | null;
+  products_id?: number | null;
+  ingredients?: Array<{ name?: string; quantity?: string | null; ids?: string[] }> | null;
+  steps?: Array<{ step_number?: number; text?: string; img?: string | null }> | null;
   nutritional?: { calories?: number; proteins?: number; fats?: number; carbs?: number } | null;
-  allergens?: Array<{ name?: string }> | null;
+  allergens?: Array<{ id?: number; name?: string }> | null;
+  sections?: Array<{ id?: number; id_parent?: number | null; name?: string }> | null;
+  categories?: Array<{ name?: string; items?: Array<{ id?: number; name?: string }> }> | null;
+  feature?: Array<{ id?: number; name?: string }> | null;
+}
+
+/** A single filter item with a numeric id and display name. */
+interface IRecipesFilterItem {
+  id: number;
+  name: string;
+}
+
+/**
+ * A filter group as it appears in `meta.filters`. Most groups have a flat `items` array of
+ * `IRecipesFilterItem`, but the "Категория" group nests sub-groups that themselves carry `items`.
+ */
+interface IRecipesFilterGroup {
+  name: string;
+  param?: string;
+  items: Array<IRecipesFilterItem | { name: string; items: IRecipesFilterItem[] }>;
+}
+
+/** Pagination and filter reference metadata returned inside `data.meta`. */
+interface IRecipesMeta {
+  limit?: number;
+  total?: number;
+  page?: number;
+  pages?: number;
+  has_more?: boolean;
+  filters?: IRecipesFilterGroup[];
+  filters_applied?: unknown[];
+}
+
+/** Shape of the `data` field returned by the upstream `vkusvill_recipes` tool (envelope unwrapped). */
+export interface IRecipesData {
+  meta?: IRecipesMeta;
+  items?: IRecipe[];
 }
 
 const formatRecipe = (r: IRecipe, index?: number): string => {
@@ -267,7 +308,7 @@ export const searchRecipesModule: IToolModule = {
       ? args.exclude_allergens.map((name: unknown) => ALLERGEN[name as string]).filter(Boolean)
       : [];
     // Upstream marks every recipe param as required, so inject defaults for anything omitted.
-    const data = await getVkusvillClient().callTool(
+    const data = await getVkusvillClient().callTool<IRecipesData>(
       'vkusvill_recipes',
       {
         q: String(args?.query ?? ''),

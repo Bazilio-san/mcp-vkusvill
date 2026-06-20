@@ -9,6 +9,49 @@ import { IToolModule } from '../_types_/common';
 
 /** get_product_details → upstream vkusvill_product_details. */
 
+/** Unwrapped `data` payload returned by the upstream `vkusvill_product_details` tool. */
+export interface IProductDetailsData {
+  id: number;
+  xml_id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  brand?: string;
+  price: {
+    current: number;
+    currency: string;
+    old: number | null;
+    discount_percent: number | null;
+  };
+  unit?: string;
+  weight?: {
+    value: number;
+    unit: string;
+  };
+  rating?: {
+    average: number;
+    count: number;
+  };
+  url?: string;
+  images?: Array<{
+    small: string;
+    medium: string;
+    large: string;
+  }>;
+  /** Breadcrumb categories from most-specific to root. */
+  category?: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    url: string;
+  }>;
+  /** Composition, nutrition, allergens, shelf life, storage, manufacturer, etc. */
+  properties?: Array<{
+    name: string;
+    value: string;
+  }>;
+}
+
 const inputSchema: IToolInputSchema = {
   type: 'object',
   properties: {
@@ -65,7 +108,11 @@ const formatProductDetails = (p: any): string => {
 export const getProductDetailsModule: IToolModule = {
   definition,
   handler: async (args, signal) => {
-    const data = await getVkusvillClient().callTool('vkusvill_product_details', { id: args?.product_id }, signal);
+    const data = await getVkusvillClient().callTool<IProductDetailsData>(
+      'vkusvill_product_details',
+      { id: args?.product_id },
+      signal,
+    );
     return asTextContent(formatProductDetails(data));
   },
 };

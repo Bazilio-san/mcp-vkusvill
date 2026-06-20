@@ -145,7 +145,7 @@ export class VkusvillClient {
   }
 
   /** Single `tools/call` round-trip. Throws on JSON-RPC error or `ok:false` envelope. */
-  private async callOnce(name: string, args: Record<string, any>, signal?: AbortSignal): Promise<any> {
+  private async callOnce<T = any>(name: string, args: Record<string, any>, signal?: AbortSignal): Promise<T> {
     if (!this.sessionId) {
       await this.initSession(signal);
     }
@@ -194,9 +194,9 @@ export class VkusvillClient {
    * first (mirrors the original Python client's retry-with-reset behaviour). Non-retryable
    * {@link VkusvillApiError}s (e.g. invalid input) propagate immediately without a retry.
    */
-  async callTool(name: string, args: Record<string, any>, signal?: AbortSignal): Promise<any> {
+  async callTool<T = any>(name: string, args: Record<string, any>, signal?: AbortSignal): Promise<T> {
     try {
-      return await this.callOnce(name, args, signal);
+      return await this.callOnce<T>(name, args, signal);
     } catch (error) {
       if (error instanceof VkusvillApiError && !error.retryable) {
         throw error;
@@ -207,7 +207,7 @@ export class VkusvillClient {
       logger.warn(`Retrying call ${name} after error: ${(error as Error).message}`);
       this.sessionId = null;
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      return this.callOnce(name, args, signal);
+      return this.callOnce<T>(name, args, signal);
     }
   }
 }

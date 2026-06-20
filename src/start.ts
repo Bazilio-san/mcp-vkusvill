@@ -27,9 +27,7 @@ const startProject = async (): Promise<void> => {
     agentBrief: AGENT_BRIEF,
     agentPrompt: AGENT_PROMPT,
     toolPrompt,
-    usedHttpHeaders: [
-      { name: 'Authorization', description: 'Token' },
-    ],
+    usedHttpHeaders: appConfig.webServer.auth.enabled ? [{ name: 'Authorization', description: 'Token' }] : [],
 
     // HTTP components
     httpComponents: { apiRouter },
