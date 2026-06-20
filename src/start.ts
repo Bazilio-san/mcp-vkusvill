@@ -2,6 +2,7 @@
 import { appConfig, initMcpServer, McpServerData, getAsset } from 'fa-mcp-sdk';
 
 import { apiRouter } from './api/router.js';
+import { primeShopsReference } from './lib/shops-reference.js';
 import { AGENT_BRIEF } from './prompts/agent-brief.js';
 import { AGENT_PROMPT } from './prompts/agent-prompt.js';
 import { toolPrompt } from './prompts/tool-prompts.js';
@@ -47,6 +48,9 @@ const startProject = async (): Promise<void> => {
 
   // Start MCP server with assembled data
   await initMcpServer(serverData);
+
+  // Warm the shop filter reference (region/city/subway) used by find_shops fuzzy search.
+  primeShopsReference();
 };
 
 startProject().catch((error) => {

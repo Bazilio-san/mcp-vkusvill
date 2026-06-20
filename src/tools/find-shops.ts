@@ -2,7 +2,8 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import { asTextContent, IToolInputSchema } from 'fa-mcp-sdk';
 
-import { formatFilters, formatListMeta, num, stripHtml } from '../lib/format.js';
+import { formatListMeta, num, stripHtml } from '../lib/format.js';
+import { filterItemLabel, getShopsReference, IFilterItem, resolveFilter } from '../lib/shops-reference.js';
 import { getVkusvillClient } from '../lib/vkusvill-client.js';
 
 import { IToolModule } from '../_types_/common';
@@ -18,27 +19,24 @@ const inputSchema: IToolInputSchema = {
       minimum: 1,
       maximum: 99999,
     },
-    region_id: {
-      type: 'integer',
-      description: 'Region ID for filtering (the list of ids is returned in the filters block at page=1)',
-      minimum: 0,
-      maximum: 999999999,
+    region: {
+      type: 'string',
+      description: `Region name for filtering (fuzzy text search, e.g. "Москва", "Татарстан"). If several regions match, the tool asks you to clarify.`,
+      maxLength: 255,
     },
-    city_id: {
-      type: 'integer',
-      description: 'City ID for filtering',
-      minimum: 0,
-      maximum: 999999999,
+    city: {
+      type: 'string',
+      description: `City name for filtering (fuzzy text search, e.g. "Казань"). Clarification is requested on ambiguity.`,
+      maxLength: 255,
     },
-    subway_id: {
-      type: 'integer',
-      description: 'Metro station ID for filtering',
-      minimum: 0,
-      maximum: 999999999,
+    subway: {
+      type: 'string',
+      description: `Metro station name for filtering (fuzzy text search, e.g. "Сокольники"). If several stations match, the tool returns the options to choose from.`,
+      maxLength: 255,
     },
     feature_id: {
       type: 'integer',
-      description: 'Shop feature ID (e.g. cafe, meat counter)',
+      description: 'Shop feature ID (e.g. cafe, meat counter). See the feature_id reference in the tool description.',
       minimum: 0,
       maximum: 999999999,
     },
@@ -50,8 +48,39 @@ const inputSchema: IToolInputSchema = {
 const definition: Tool = {
   name: 'find_shops',
   title: 'Find shops',
-  description: `Search VkusVill shops: address, coordinates, phone, opening hours, features. 
-To find the available region, city and metro ids for filters, call without filters (page=1) — the reference will come in the filters block.`,
+  description: `Search VkusVill shops: address, coordinates, phone, opening hours, features.
+Filter by region / city / metro using plain names — they are matched by fuzzy search. 
+For the feature filter pass feature_id:
+\`\`\`csv
+feature_id,feature_ru
+7488,Пекарня
+7491,Сокомат
+7740,Мясная витрина
+21257,Снятие наличных
+25791,Сбор пластиковых карт
+26465,Кофе с собой
+36178,Кафе
+44806,Рыбная витрина
+76205,Отдел без упаковки
+80920,Цветы
+89747,Фандоматы
+90760,ВкусВилл Айс
+916754,Сбор книг
+916756,Сбор блистеров
+5048867,Винный отдел
+5048868,Сбор крышечек
+5048869,Сбор батареек
+5048870,Сбор вещей
+5048871,Сбор детских вещей
+5048872,Экообменники: крышечки
+5048873,Бытовая химия на розлив
+5048874,Бокс помощи нуждающимся
+5048875,Бокс помощи животным
+5048877,ВкусВилл Мини
+5051431,Грейстор
+5051432,Даркстор
+5657354,Экообменники: батарейки
+\`\`\``,
   inputSchema,
 };
 
@@ -112,20 +141,59 @@ const formatShopsList = (data: { meta?: any; items?: IShop[] } | undefined): str
   }
   const header = formatListMeta(data?.meta, 'shops');
   const blocks = items.map((s, i) => formatShop(s, i + 1));
-  const filters = formatFilters(data?.meta?.filters);
-  return [header, '', ...blocks, filters].filter(Boolean).join('\n\n');
+  // The filter reference (region/city/subway/feature) is resolved internally and exposed via the tool prompt,
+  // so it is intentionally not dumped into the shop list output anymore.
+  return [header, '', ...blocks].filter(Boolean).join('\n\n');
+};
+
+/** Resolve a free-text filter; returns its id, or a clarification block when the match is ambiguous/missing. */
+const resolveTextFilter = (
+  label: string,
+  items: IFilterItem[],
+  query: unknown,
+): { id: number } | { problem: string } => {
+  if (typeof query !== 'string' || !query.trim()) {
+    return { id: 0 };
+  }
+  const outcome = resolveFilter(items, query);
+  if (outcome.status === 'resolved') {
+    return { id: outcome.item.id };
+  }
+  if (outcome.status === 'none') {
+    return {
+      problem: `По запросу «${query}» в справочнике «${label}» не найдено ни одного подходящего варианта. Уточните название.`,
+    };
+  }
+  const list = outcome.candidates.map((c) => `- ${filterItemLabel(c)}`).join('\n');
+  return {
+    problem: `По запросу «${query}» в справочнике «${label}» найдено несколько подходящих вариантов. Уточните, какой из них имеется в виду:\n${list}`,
+  };
 };
 
 export const findShopsModule: IToolModule = {
   definition,
   handler: async (args, signal) => {
+    const ref = await getShopsReference(signal);
+
+    const region = resolveTextFilter('Регион', ref.region, args?.region);
+    const city = resolveTextFilter('Город', ref.city, args?.city);
+    const subway = resolveTextFilter('Метро', ref.subway, args?.subway);
+
+    // If any text filter could not be resolved unambiguously, ask the user to clarify before querying shops.
+    const problems = [region, city, subway]
+      .filter((r): r is { problem: string } => 'problem' in r)
+      .map((r) => r.problem);
+    if (problems.length) {
+      return asTextContent(problems.join('\n\n'));
+    }
+
     const data = await getVkusvillClient().callTool(
       'vkusvill_shops',
       {
         page: args?.page ?? 1,
-        id_region_filter: args?.region_id ?? 0,
-        id_city_filter: args?.city_id ?? 0,
-        id_subway_filter: args?.subway_id ?? 0,
+        id_region_filter: (region as { id: number }).id,
+        id_city_filter: (city as { id: number }).id,
+        id_subway_filter: (subway as { id: number }).id,
         id_feature_filter: args?.feature_id ?? 0,
       },
       signal,
